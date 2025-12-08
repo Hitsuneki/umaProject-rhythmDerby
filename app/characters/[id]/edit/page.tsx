@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useUmaStore } from '@/stores/umaStore';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -14,29 +13,62 @@ import type { Temperament, Style, Trait } from '@/types';
 export default function EditCharacterPage() {
   const router = useRouter();
   const params = useParams();
-  const { getUmaById, updateUma } = useUmaStore();
   const [mounted, setMounted] = useState(false);
-
-  const uma = getUmaById(params.id as string);
-
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [uma, setUma] = useState<any | null>(null);
   const [formData, setFormData] = useState({
-    name: uma?.name || '',
-    temperament: (uma?.temperament || 'calm') as Temperament,
-    style: (uma?.style || 'runner') as Style,
-    trait: (uma?.trait || 'speed_boost') as Trait,
+    name: '',
+    temperament: 'calm' as Temperament,
+    style: 'runner' as Style,
+    trait: 'speed_boost' as Trait,
   });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  useEffect(() => {
+    const loadUma = async () => {
+      try {
+        const res = await fetch(`/api/uma/${params.id}`);
+        if (!res.ok) throw new Error('Uma not found');
+        const data = await res.json();
+        setUma(data);
+        setFormData({
+          name: data.name,
+          temperament: data.temperament,
+          style: data.style,
+          trait: data.trait,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load Uma');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUma();
+  }, [params.id]);
+
   if (!mounted) return null;
 
-  if (!uma) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
+          <p className="text-(--grey-dark)">Loading Uma...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!uma || error) {
     return (
       <Card className="text-center py-16">
         <h2 className="font-display text-2xl font-bold mb-4 text-(--charcoal)">
-          Uma Not Found
+          {error || 'Uma Not Found'}
         </h2>
         <Link href="/characters">
           <Button variant="primary">Back to Characters</Button>
@@ -45,11 +77,22 @@ export default function EditCharacterPage() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    updateUma(uma.id, formData);
+    try {
+      const res = await fetch(`/api/uma/${uma.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error('Failed to update Uma');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update Uma');
+      return;
+    }
+
     router.push('/characters');
   };
 

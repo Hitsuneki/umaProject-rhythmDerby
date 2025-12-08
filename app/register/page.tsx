@@ -36,11 +36,11 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const success = await register(email, username, password);
-      if (success) {
+      const result = await register(email, username, password);
+      if (result.success) {
         router.push('/');
       } else {
-        setError('Registration failed. Please try again.');
+        setError(result.message || 'Registration failed. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

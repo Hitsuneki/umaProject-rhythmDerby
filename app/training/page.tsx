@@ -1,17 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUmaStore } from '@/stores/umaStore';
-import { useTrainingStore } from '@/stores/trainingStore';
-import { useInventoryStore } from '@/stores/inventoryStore';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { StatBar } from '@/components/ui/StatBar';
 import { Badge } from '@/components/ui/Badge';
 import { Zap, Target, Activity, TrendingUp, ArrowLeft, RotateCcw, Circle, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { SessionType } from '@/types';
+import type { SessionType, Uma } from '@/types';
 
 const SESSION_DURATION = 12000; // 12 seconds
 const TICK_INTERVAL = 100; // Update every 100ms
@@ -21,10 +18,12 @@ const MAX_CHARGE = 3;
 
 export default function TrainingPage() {
   const router = useRouter();
-  const { umas, selectedUmaId, updateUma, getUmaById, regenerateEnergy } = useUmaStore();
-  const { addLog, startSession, endSession } = useTrainingStore();
-  const { activeBoost, clearActiveBoost } = useInventoryStore();
-  
+  const searchParams = useSearchParams();
+  const umaId = searchParams.get('id');
+
+  const [currentUma, setCurrentUma] = useState<Uma | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [selectedSession, setSelectedSession] = useState<SessionType | null>(null);
   const [isTraining, setIsTraining] = useState(false);
@@ -43,19 +42,28 @@ export default function TrainingPage() {
     setMounted(true);
   }, []);
 
-  const currentUma = selectedUmaId ? getUmaById(selectedUmaId) : umas[0];
-
-  // Regenerate energy periodically
   useEffect(() => {
-    if (!currentUma) return;
+    const loadUma = async () => {
+      if (!umaId) {
+        setError('No Uma selected');
+        setLoading(false);
+        return;
+      }
 
-    const interval = setInterval(() => {
-      regenerateEnergy(currentUma.id);
-    }, 1000);
+      try {
+        const res = await fetch(`/api/uma/${umaId}`);
+        if (!res.ok) throw new Error('Failed to fetch Uma');
+        const data = await res.json();
+        setCurrentUma(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load Uma');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    return () => clearInterval(interval);
-  }, [currentUma, regenerateEnergy]);
-
+    loadUma();
+  }, [umaId]);
   useEffect(() => {
     if (!isTraining) return;
 
@@ -92,7 +100,6 @@ export default function TrainingPage() {
     setCharge(0);
     setBurstActive(false);
     setResult(null);
-    startSession(currentUma.id, sessionType);
   };
 
   const handleClick = () => {
@@ -138,20 +145,13 @@ export default function TrainingPage() {
     }, 300);
   };
 
-  const finishTraining = useCallback(() => {
+  const finishTraining = useCallback(async () => {
     if (!currentUma || !selectedSession) return;
 
     setIsTraining(false);
-    endSession();
 
     const totalClicks = goodRhythm + missRhythm;
     let quality = totalClicks > 0 ? Math.round((goodRhythm / totalClicks) * 100) : 0;
-
-    // Apply training boost if active
-    if (activeBoost && activeBoost.type === 'training') {
-      quality = Math.min(100, quality + activeBoost.value);
-      clearActiveBoost();
-    }
 
     // Quality label
     let label = 'Rough Session';
@@ -171,43 +171,53 @@ export default function TrainingPage() {
         gains.speed = Math.floor(baseGain * energyMultiplier);
         if (quality >= 80) gains.technique += 1; // Bonus for excellent form
         break;
-      
+
       case 'stamina':
         gains.stamina = Math.floor(baseGain * energyMultiplier);
         if (quality < 40) gains.speed = Math.max(-1, -1); // Penalty for poor form
         break;
-      
+
       case 'technique':
         gains.technique = Math.floor(baseGain * energyMultiplier);
         break;
-      
+
       case 'mixed':
         const mixedGain = Math.floor((baseGain / 2) * energyMultiplier);
         gains = { speed: mixedGain, stamina: mixedGain, technique: mixedGain };
         break;
     }
 
-    // Ensure no negative stats
-    const newSpeed = Math.max(0, Math.min(100, currentUma.speed + gains.speed));
-    const newStamina = Math.max(0, Math.min(100, currentUma.stamina + gains.stamina));
-    const newTechnique = Math.max(0, Math.min(100, currentUma.technique + gains.technique));
+    try {
+      // Post training results to API
+      await fetch('/api/training', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          umaId: currentUma.id,
+          sessionType: selectedSession,
+          qualityPct: quality,
+          speedDelta: gains.speed,
+          staminaDelta: gains.stamina,
+          techniqueDelta: gains.technique,
+          energyBefore: currentUma.energy,
+          energyAfter: Math.max(0, currentUma.energy - 15),
+        }),
+      });
 
-    addLog({
-      umaId: currentUma.id,
-      sessionType: selectedSession,
-      quality,
-      statGains: gains,
-    });
+      // Update local state with new stats
+      setCurrentUma({
+        ...currentUma,
+        speed: Math.max(0, Math.min(100, currentUma.speed + gains.speed)),
+        stamina: Math.max(0, Math.min(100, currentUma.stamina + gains.stamina)),
+        technique: Math.max(0, Math.min(100, currentUma.technique + gains.technique)),
+        energy: Math.max(0, currentUma.energy - 15),
+      });
 
-    updateUma(currentUma.id, {
-      speed: newSpeed,
-      stamina: newStamina,
-      technique: newTechnique,
-      energy: Math.max(0, currentUma.energy - 15),
-    });
-
-    setResult({ quality, gains, label });
-  }, [currentUma, selectedSession, goodRhythm, missRhythm, addLog, updateUma, endSession]);
+      setResult({ quality, gains, label });
+    } catch (err) {
+      setError('Failed to save training results');
+    }
+  }, [currentUma, selectedSession, goodRhythm, missRhythm]);
 
   const reset = () => {
     setSelectedSession(null);
@@ -216,6 +226,17 @@ export default function TrainingPage() {
   };
 
   if (!mounted) return null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
+          <p className="text-(--grey-dark)">Loading Uma...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!currentUma) {
     return (
