@@ -3,39 +3,79 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUmaStore } from '@/stores/umaStore';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { StatBar } from '@/components/ui/StatBar';
 import { Plus, Zap, Trophy, Edit, Trash2, User } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { Uma } from '@/types';
 
 export default function CharactersPage() {
   const router = useRouter();
-  const { umas, deleteUma, selectUma } = useUmaStore();
-  const [mounted, setMounted] = useState(false);
+  const [umas, setUmas] = useState<Uma[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    fetchUmas();
   }, []);
 
-  if (!mounted) return null;
-
-  const handleDelete = (id: string) => {
-    deleteUma(id);
-    setDeleteConfirm(null);
+  const fetchUmas = async () => {
+    try {
+      const response = await fetch('/api/uma');
+      if (!response.ok) throw new Error('Failed to fetch umas');
+      const data = await response.json();
+      setUmas(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load characters');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  const handleDelete = async (id: string) => {
+    try {
+      const response = await fetch(`/api/uma/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete character');
+      setUmas(umas.filter(uma => uma.id !== id));
+      setDeleteConfirm(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete character');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
+          <p className="text-(--grey-dark)">Loading characters...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Button onClick={fetchUmas} variant="primary">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
+
   const handleTrain = (id: string) => {
-    selectUma(id);
-    router.push('/training');
+    router.push(`/training?id=${id}`);
   };
 
   const handleRace = (id: string) => {
-    selectUma(id);
-    router.push('/racing');
+    router.push(`/racing?id=${id}`);
   };
 
   return (

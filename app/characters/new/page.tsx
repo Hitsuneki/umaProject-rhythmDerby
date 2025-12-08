@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useUmaStore } from '@/stores/umaStore';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -17,7 +16,6 @@ const STAT_BUDGET = 150;
 
 export default function NewCharacterPage() {
   const router = useRouter();
-  const { addUma } = useUmaStore();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -28,6 +26,8 @@ export default function NewCharacterPage() {
     stamina: 50,
     technique: 50,
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const totalStats = formData.speed + formData.stamina + formData.technique;
   const remainingPoints = STAT_BUDGET - totalStats;
@@ -45,19 +45,34 @@ export default function NewCharacterPage() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
-    addUma({
-      ...formData,
-      level: 1,
-      energy: 100,
-      maxEnergy: 100,
-      comfortZone: 50,
-    });
+    setSaving(true);
+    setError(null);
 
-    router.push('/characters');
+    try {
+      const res = await fetch('/api/uma', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...formData,
+          level: 1,
+          energy: 100,
+          maxEnergy: 100,
+          comfortZone: 50,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create character');
+
+      router.push('/characters');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create character');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const previewId = `preview-${Date.now()}`;
@@ -89,6 +104,12 @@ export default function NewCharacterPage() {
             </h2>
             
             <div className="space-y-4">
+              {error && (
+                <div className="p-3 rounded bg-red-50 border border-red-200 text-red-700 text-sm">
+                  {error}
+                </div>
+              )}
+
               <Input
                 label="Name"
                 value={formData.name}
@@ -226,9 +247,9 @@ export default function NewCharacterPage() {
                 variant="primary"
                 className="w-full mt-6"
                 icon={<Save />}
-                disabled={!formData.name.trim() || remainingPoints < 0}
+                disabled={!formData.name.trim() || remainingPoints < 0 || saving}
               >
-                Create Uma
+                {saving ? 'Creating...' : 'Create Uma'}
               </Button>
             </div>
           </Card>

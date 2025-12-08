@@ -33,11 +33,11 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result.success) {
         router.push('/');
       } else {
-        setError('Invalid credentials. Please try again.');
+        setError(result.message || 'Invalid credentials. Please try again.');
       }
     } catch (err) {
       setError('An error occurred. Please try again.');

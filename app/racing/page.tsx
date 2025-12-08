@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUmaStore } from '@/stores/umaStore';
-import { useRaceStore } from '@/stores/raceStore';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Trophy, ArrowLeft, Circle, Zap, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { DistanceType } from '@/types';
+import type { DistanceType, Uma } from '@/types';
 
 const RACE_DISTANCES = {
   '1200m': { distance: 1000, duration: 20000, label: 'Short' },
@@ -49,10 +47,12 @@ interface TrackZone {
 
 export default function RacingPage() {
   const router = useRouter();
-  const { umas, selectedUmaId, updateUma, getUmaById, regenerateEnergy } = useUmaStore();
-  const { addRace, startRace, endRace } = useRaceStore();
-  
-  const [mounted, setMounted] = useState(false);
+  const searchParams = useSearchParams();
+  const umaId = searchParams.get('id');
+
+  const [currentUma, setCurrentUma] = useState<Uma | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedDistance, setSelectedDistance] = useState<DistanceType | null>(null);
   const [isRacing, setIsRacing] = useState(false);
   
@@ -68,26 +68,31 @@ export default function RacingPage() {
   const [charge, setCharge] = useState(0);
   const [goodRhythm, setGoodRhythm] = useState(0);
   const [offBeatClicks, setOffBeatClicks] = useState(0);
-  const [phaseQualities, setPhaseQualities] = useState<number[]>([]);
   
   const [result, setResult] = useState<{ placement: number; score: number; time: number } | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    if (!umaId) {
+      setError('No Uma selected');
+      setLoading(false);
+      return;
+    }
 
-  const currentUma = selectedUmaId ? getUmaById(selectedUmaId) : umas[0];
+    const fetchUma = async () => {
+      try {
+        const response = await fetch(`/api/uma/${umaId}`);
+        if (!response.ok) throw new Error('Failed to fetch Uma');
+        const data = await response.json();
+        setCurrentUma(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load Uma');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Regenerate energy periodically
-  useEffect(() => {
-    if (!currentUma) return;
-
-    const interval = setInterval(() => {
-      regenerateEnergy(currentUma.id);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [currentUma, regenerateEnergy]);
+    fetchUma();
+  }, [umaId]);
 
   // Generate track zones
   const generateTrackZones = useCallback((distance: number) => {
@@ -344,11 +349,10 @@ export default function RacingPage() {
     setSweetZoneStart(Math.random() * 0.7);
   };
 
-  const finishRace = useCallback(() => {
+  const finishRace = useCallback(async () => {
     if (!currentUma || !selectedDistance) return;
 
     setIsRacing(false);
-    endRace();
 
     // Calculate placement
     const sortedRunners = [...runners].sort((a, b) => b.position - a.position);
@@ -366,34 +370,50 @@ export default function RacingPage() {
     const overallQuality = totalClicks > 0 ? Math.round((goodRhythm / totalClicks) * 100) : 0;
     const qualities = [overallQuality, overallQuality, overallQuality]; // Simplified
 
-    addRace(
-      {
-        umaId: currentUma.id,
-        distanceType: selectedDistance,
+    try {
+      // Post race results to API
+      await fetch('/api/races', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          umaId: currentUma.id,
+          distanceType: selectedDistance,
+          startQuality: qualities[0],
+          midQuality: qualities[1],
+          finalQuality: qualities[2],
+          overallQuality,
+          raceScore: totalScore,
+          placement,
+          participants: runners.map(r => ({
+            isPlayer: r.isPlayer,
+            name: r.name,
+            speed: r.speed,
+            stamina: r.stamina,
+            technique: r.technique,
+            lanePath: r.lane.toString(),
+            finalPos: r.position,
+          })),
+        }),
+      });
+
+      // Award XP (update local state)
+      const xpGain = placement === 1 ? 1 : 0;
+      if (currentUma.level < 99 && xpGain > 0) {
+        setCurrentUma({
+          ...currentUma,
+          level: currentUma.level + xpGain,
+        });
+      }
+
+      setResult({
         placement,
         score: totalScore,
-      },
-      {
-        umaId: currentUma.id,
-        phaseQuality: qualities,
-        chargesUsed: Math.floor(goodRhythm / 3),
-      }
-    );
-
-    // Award XP
-    const xpGain = placement === 1 ? 1 : 0;
-    if (currentUma.level < 99 && xpGain > 0) {
-      updateUma(currentUma.id, {
-        level: currentUma.level + xpGain,
+        time: Math.round(timeElapsed / 1000)
       });
+    } catch (err) {
+      setError('Failed to save race results');
     }
-
-    setResult({ 
-      placement, 
-      score: totalScore, 
-      time: Math.round(timeElapsed / 1000) 
-    });
-  }, [currentUma, selectedDistance, runners, goodRhythm, offBeatClicks, timeElapsed, addRace, updateUma, endRace]);
+  }, [currentUma, selectedDistance, runners, goodRhythm, offBeatClicks, timeElapsed]);
 
   const reset = () => {
     setSelectedDistance(null);
@@ -401,9 +421,26 @@ export default function RacingPage() {
     setResult(null);
   };
 
-  if (!mounted) return null;
+  // Calculate variables used in render
+  const raceConfig = selectedDistance ? RACE_DISTANCES[selectedDistance] : null;
+  const playerRunner = runners.find(r => r.isPlayer);
+  const sortedRunners = [...runners].sort((a, b) => b.position - a.position);
+  const currentPlacement = playerRunner ? sortedRunners.indexOf(playerRunner) + 1 : 4;
+  const sweetZoneStartPercent = sweetZoneStart * 100;
+  const beatPositionPercent = beatPosition * 100;
 
-  if (!currentUma) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
+          <p className="text-(--grey-dark)">Loading Uma...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !currentUma) {
     return (
       <Card className="text-center py-16">
         <h2 className="font-display text-2xl font-bold mb-4 text-(--charcoal)">
@@ -418,14 +455,6 @@ export default function RacingPage() {
       </Card>
     );
   }
-
-  const raceConfig = selectedDistance ? RACE_DISTANCES[selectedDistance] : null;
-  const playerRunner = runners.find(r => r.isPlayer);
-  const sortedRunners = [...runners].sort((a, b) => b.position - a.position);
-  const currentPlacement = playerRunner ? sortedRunners.indexOf(playerRunner) + 1 : 4;
-
-  const sweetZoneStartPercent = sweetZoneStart * 100;
-  const beatPositionPercent = beatPosition * 100;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">

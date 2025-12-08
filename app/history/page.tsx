@@ -2,40 +2,118 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useUmaStore } from '@/stores/umaStore';
-import { useRaceStore } from '@/stores/raceStore';
-import { useTrainingStore } from '@/stores/trainingStore';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Select } from '@/components/ui/Select';
 import { Trophy, TrendingUp, Trash2, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { Uma } from '@/types';
 
 export default function HistoryPage() {
-  const { umas } = useUmaStore();
-  const { races, deleteRace } = useRaceStore();
-  const { logs, deleteLog } = useTrainingStore();
+  const [umas, setUmas] = useState<Uma[]>([]);
+  const [races, setRaces] = useState<any[]>([]);
+  const [trainingLogs, setTrainingLogs] = useState<any[]>([]);
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'races' | 'training'>('races');
   const [filterUma, setFilterUma] = useState<string>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const [racesRes, trainingRes, umasRes] = await Promise.all([
+        fetch('/api/races'),
+        fetch('/api/training'),
+        fetch('/api/uma')
+      ]);
+
+      if (!racesRes.ok || !trainingRes.ok || !umasRes.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const [racesData, trainingData, umasData] = await Promise.all([
+        racesRes.json(),
+        trainingRes.json(),
+        umasRes.json()
+      ]);
+
+      setRaces(racesData);
+      setTrainingLogs(trainingData);
+      setUmas(umasData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     setMounted(true);
+    fetchData();
   }, []);
 
   if (!mounted) return null;
 
-  const filteredRaces = filterUma === 'all' 
-    ? races 
+  const filteredRaces = filterUma === 'all'
+    ? races
     : races.filter((r) => r.umaId === filterUma);
 
   const filteredLogs = filterUma === 'all'
-    ? logs
-    : logs.filter((l) => l.umaId === filterUma);
+    ? trainingLogs
+    : trainingLogs.filter((l) => l.umaId === filterUma);
 
-  const sortedRaces = [...filteredRaces].sort((a, b) => b.timestamp - a.timestamp);
-  const sortedLogs = [...filteredLogs].sort((a, b) => b.timestamp - a.timestamp);
+  const getTime = (value: any) => {
+    const ts = value?.createdAt ?? value?.timestamp ?? value;
+    return ts ? new Date(ts).getTime() : 0;
+  };
+
+  const sortedRaces = [...filteredRaces].sort((a, b) => getTime(b) - getTime(a));
+  const sortedLogs = [...filteredLogs].sort((a, b) => getTime(b) - getTime(a));
+
+  const handleDeleteRace = async (raceId: string) => {
+    try {
+      await fetch(`/api/races/${raceId}`, { method: 'DELETE' });
+      setRaces(races.filter(r => r.id !== raceId));
+    } catch (err) {
+      setError('Failed to delete race');
+    }
+  };
+
+  const handleDeleteLog = async (logId: string) => {
+    try {
+      await fetch(`/api/training/${logId}`, { method: 'DELETE' });
+      setTrainingLogs(trainingLogs.filter(l => l.id !== logId));
+    } catch (err) {
+      setError('Failed to delete training log');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
+          <p className="text-(--grey-dark)">Loading history...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-16">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Button onClick={fetchData} variant="primary">
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -128,7 +206,7 @@ export default function HistoryPage() {
                         <td className="py-3 px-4 text-sm text-(--charcoal)">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-(--grey-dark)" />
-                            {new Date(race.timestamp).toLocaleDateString()}
+                            {new Date(race.createdAt ?? race.timestamp ?? Date.now()).toLocaleDateString()}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-(--charcoal)">
@@ -149,7 +227,7 @@ export default function HistoryPage() {
                           <Button
                             variant="secondary"
                             className="text-xs py-1 px-3"
-                            onClick={() => deleteRace(race.id)}
+                            onClick={() => handleDeleteRace(race.id)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -211,7 +289,7 @@ export default function HistoryPage() {
                         <td className="py-3 px-4 text-sm text-(--charcoal)">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4 text-(--grey-dark)" />
-                            {new Date(log.timestamp).toLocaleDateString()}
+                            {new Date(log.createdAt ?? log.timestamp ?? Date.now()).toLocaleDateString()}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-(--charcoal)">
@@ -225,16 +303,16 @@ export default function HistoryPage() {
                         </td>
                         <td className="py-3 px-4">
                           <div className="flex items-center justify-center gap-3 text-xs stat-mono">
-                            <span className="text-(--charcoal)">+{log.statGains.speed} SPD</span>
-                            <span className="text-(--charcoal)">+{log.statGains.stamina} STA</span>
-                            <span className="text-(--charcoal)">+{log.statGains.technique} TEC</span>
+                            <span className="text-(--charcoal)">+{log.speedDelta ?? 0} SPD</span>
+                            <span className="text-(--charcoal)">+{log.staminaDelta ?? 0} STA</span>
+                            <span className="text-(--charcoal)">+{log.techniqueDelta ?? 0} TEC</span>
                           </div>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <Button
                             variant="secondary"
                             className="text-xs py-1 px-3"
-                            onClick={() => deleteLog(log.id)}
+                            onClick={() => handleDeleteLog(log.id)}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>

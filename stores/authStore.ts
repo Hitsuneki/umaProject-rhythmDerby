@@ -11,10 +11,9 @@ export interface User {
 interface AuthStore {
   user: User | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
-  register: (email: string, username: string, password: string) => Promise<boolean>;
-  deleteAccount: () => Promise<boolean>;
+  register: (email: string, username: string, password: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -23,51 +22,57 @@ export const useAuthStore = create<AuthStore>()(
       user: null,
       isAuthenticated: false,
 
-      login: async (email: string, password: string) => {
-        // Mock authentication - in production, this would call an API
-        // For demo purposes, accept any email/password combination
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-        
+      login: async (identifier: string, password: string) => {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({}));
+          return { success: false, message: error?.message || 'Login failed' };
+        }
+
+        const data = await res.json();
         const user: User = {
-          id: `user-${Date.now()}`,
-          email,
-          username: email.split('@')[0],
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.username,
           createdAt: Date.now(),
         };
 
         set({ user, isAuthenticated: true });
-        return true;
+        return { success: true };
       },
 
       logout: () => {
+        fetch('/api/auth/login', { method: 'DELETE' }).catch(() => undefined);
         set({ user: null, isAuthenticated: false });
       },
 
       register: async (email: string, username: string, password: string) => {
-        // Mock registration - in production, this would call an API
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-        
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, username, password }),
+        });
+
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({}));
+          return { success: false, message: error?.message || 'Registration failed' };
+        }
+
+        const data = await res.json();
         const user: User = {
-          id: `user-${Date.now()}`,
-          email,
-          username,
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.username,
           createdAt: Date.now(),
         };
 
         set({ user, isAuthenticated: true });
-        return true;
-      },
-
-      deleteAccount: async () => {
-        // Mock account deletion - in production, this would call an API
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
-        
-        // Clear user data
-        set({ user: null, isAuthenticated: false });
-        
-        // In production, you would also clear all related data from other stores
-        // For now, we'll just clear auth state
-        return true;
+        return { success: true };
       },
     }),
     {
