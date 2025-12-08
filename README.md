@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Uma Project: Rhythm Derby
+Uma Project: Rhythm Derby is a minimalist Uma‑inspired training and racing sim built with Next.js, Node.js, Tailwind, and MySQL. Train a tiny stable of runners in short rhythm sessions, then test them in one‑button horizontal races using the Lane Pulse system.
 
-## Getting Started
+Features
+Uma Creation & Management
+Create and customize Uma characters with unique stats, temperament, and traits. Manage your stable, retire runners, and review their history.
 
-First, run the development server:
+Rhythm Training Mode
+Choose a session type (Speed, Stamina, Technique, Mixed) and play a short click‑based rhythm mini‑game to shape your Uma’s stats and consume Energy.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+Lane Pulse Racing
+Race horizontally against AI in three phases (Start/Mid/Final). Click on beat to charge bursts, click off‑beat to switch lanes and line up with boost zones.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Progression & History
+Persistent stats, training logs, and race records stored in MySQL. View past runs, placements, and how each Uma developed over time.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Tech Stack
+text
+Frontend : Next.js + React + Tailwind CSS
+Backend  : Node.js (API routes)
+Database : MySQL
+Style    : Futuristic anime racing UI inspired by Uma Musume
+Project Goals
+Deliver a simple but addictive one‑button racing experience.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Demonstrate full CRUD across characters, training logs, and races.
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Explore a clean, data‑driven design that can grow with features like energy timers, inventory, and gacha.
