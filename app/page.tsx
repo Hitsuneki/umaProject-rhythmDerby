@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useAuthStore } from '@/stores/authStore';
 import { useUmaStore } from '@/stores/umaStore';
 import { useTrainingStore } from '@/stores/trainingStore';
 import { useRaceStore } from '@/stores/raceStore';
@@ -14,6 +15,7 @@ import { Zap, Trophy, Users, TrendingUp, Award, Star, Package, Sparkles, User } 
 import { motion } from 'framer-motion';
 
 export default function Dashboard() {
+  const { user } = useAuthStore();
   const { umas, selectedUmaId, regenerateEnergy, getTimeToNextEnergy } = useUmaStore();
   const { getLatestLog } = useTrainingStore();
   const { getLatestRace } = useRaceStore();
@@ -67,7 +69,7 @@ export default function Dashboard() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h1 className="font-display text-4xl md:text-5xl font-bold mb-3">
-                UMA RACING DASHBOARD
+                WELCOME BACK, {user?.username.toUpperCase()}
               </h1>
               <p className="text-lg text-white/80 font-body">
                 Train your Uma Musume • Compete in races • Build your legacy

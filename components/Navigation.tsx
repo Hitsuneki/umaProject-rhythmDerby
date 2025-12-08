@@ -54,14 +54,14 @@ export function Navigation() {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-(--panel-bg) backdrop-blur-lg border-b border-(--border)">
+    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b shadow-sm" style={{ backgroundColor: 'var(--panel-bg)', borderColor: 'var(--border)' }}>
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-(--accent) rounded-lg flex items-center justify-center">
-              <Trophy className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent)' }}>
+              <Trophy className="w-6 h-6 text-white" style={{ width: '24px', height: '24px', color: 'white' }} />
             </div>
-            <span className="font-display text-xl font-bold uppercase tracking-wider text-(--charcoal)">
+            <span className="font-display text-xl font-bold uppercase tracking-wider" style={{ color: 'var(--charcoal)' }}>
               Uma Racing
             </span>
           </Link>
@@ -77,18 +77,16 @@ export function Navigation() {
                   <motion.div
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    className={`relative px-4 py-2 rounded-lg flex items-center gap-2 font-display text-sm uppercase tracking-wide transition-colors ${
-                      isActive
-                        ? 'text-(--accent)'
-                        : 'text-(--grey-dark) hover:text-(--charcoal)'
-                    }`}
+                    className="relative px-4 py-2 rounded-lg flex items-center gap-2 font-display text-sm uppercase tracking-wide transition-colors"
+                    style={{ color: isActive ? 'var(--accent)' : 'var(--grey-dark)' }}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-4 h-4" style={{ width: '16px', height: '16px' }} />
                     <span className="hidden md:inline">{item.label}</span>
                     {isActive && (
                       <motion.div
                         layoutId="activeNav"
-                        className="absolute inset-0 bg-(--accent)/10 rounded-lg -z-10"
+                        className="absolute inset-0 rounded-lg -z-10"
+                        style={{ backgroundColor: 'rgba(255, 79, 0, 0.1)' }}
                         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
                       />
                     )}
@@ -97,22 +95,38 @@ export function Navigation() {
               );
             })}
 
-            {/* User Dropdown */}
+            {/* User Profile Dropdown */}
             {isAuthenticated && user && (
-              <div className="relative ml-4" ref={dropdownRef}>
+              <div className="relative ml-6" ref={dropdownRef}>
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-(--panel-bg) border border-(--border) hover:border-(--accent) transition-colors"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg border-2 transition-all shadow-sm"
+                  style={{ 
+                    backgroundColor: 'var(--panel-bg)', 
+                    borderColor: isDropdownOpen ? 'var(--accent)' : 'var(--border)' 
+                  }}
                 >
-                  <UserCircle className="w-5 h-5 text-(--accent)" style={{ width: '20px', height: '20px', color: 'var(--accent)' }} />
-                  <span className="hidden md:inline font-body text-sm text-(--charcoal) max-w-[120px] truncate">
-                    {user.username}
-                  </span>
+                  {/* Profile Picture */}
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-display font-bold text-lg shadow-md" style={{ backgroundImage: 'linear-gradient(to bottom right, var(--accent), var(--accent-dark))' }}>
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  
+                  {/* User Info */}
+                  <div className="hidden md:flex flex-col items-start">
+                    <span className="font-display text-sm font-semibold leading-tight" style={{ color: 'var(--charcoal)' }}>
+                      {user.username}
+                    </span>
+                    <span className="text-xs" style={{ color: 'var(--grey-dark)' }}>
+                      Trainer
+                    </span>
+                  </div>
+
+                  {/* Dropdown Arrow */}
                   <ChevronDown 
-                    className={`w-4 h-4 text-(--grey-dark) transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
-                    style={{ width: '16px', height: '16px', color: 'var(--grey-dark)' }}
+                    className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                    style={{ width: '20px', height: '20px', color: 'var(--grey-dark)' }}
                   />
                 </motion.button>
 
@@ -123,68 +137,70 @@ export function Navigation() {
                       initial={{ opacity: 0, y: -10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 mt-2 w-64 bg-(--panel-bg) backdrop-blur-lg border border-(--border) rounded-lg shadow-lg overflow-hidden z-50"
+                      transition={{ duration: 0.2 }}
+                      className="absolute right-0 mt-3 w-56 backdrop-blur-lg border-2 rounded-xl shadow-2xl overflow-hidden z-50"
+                      style={{ backgroundColor: 'var(--panel-bg)', borderColor: 'var(--border)' }}
                     >
-                      {/* User Info */}
-                      <div className="px-4 py-3 border-b border-(--border)">
-                        <p className="text-xs uppercase tracking-wide text-(--grey-dark) font-display mb-1">
-                          Signed in as
-                        </p>
-                        <p className="text-sm font-medium text-(--charcoal) truncate">
-                          {user.email}
-                        </p>
-                      </div>
-
-                      {/* Menu Items */}
-                      <div className="py-2">
-                        {!showDeleteConfirm ? (
-                          <>
-                            {/* Sign Out */}
-                            <button
-                              onClick={handleLogout}
-                              className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-(--grey-light) transition-colors group"
-                            >
-                              <LogOut className="w-4 h-4 text-(--grey-dark) group-hover:text-(--accent)" style={{ width: '16px', height: '16px', color: 'var(--grey-dark)' }} />
-                              <span className="text-sm font-display uppercase tracking-wide text-(--charcoal) group-hover:text-(--accent)">
-                                Sign Out
-                              </span>
-                            </button>
-
-                            {/* Delete Account */}
-                            <button
-                              onClick={() => setShowDeleteConfirm(true)}
-                              className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-red-50 transition-colors group"
-                            >
-                              <Trash2 className="w-4 h-4 text-(--grey-dark) group-hover:text-red-500" style={{ width: '16px', height: '16px', color: 'var(--grey-dark)' }} />
-                              <span className="text-sm font-display uppercase tracking-wide text-(--charcoal) group-hover:text-red-500">
-                                Delete Account
-                              </span>
-                            </button>
-                          </>
-                        ) : (
-                          /* Delete Confirmation */
-                          <div className="px-4 py-3">
-                            <p className="text-sm text-(--charcoal) mb-3">
-                              Are you sure? This action cannot be undone.
-                            </p>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleDeleteAccount}
-                                className="flex-1 px-3 py-2 bg-red-500 text-white text-xs font-display uppercase tracking-wide rounded hover:bg-red-600 transition-colors"
-                              >
-                                Delete
-                              </button>
-                              <button
-                                onClick={() => setShowDeleteConfirm(false)}
-                                className="flex-1 px-3 py-2 bg-(--grey-light) text-(--charcoal) text-xs font-display uppercase tracking-wide rounded hover:bg-(--grey-medium) transition-colors"
-                              >
-                                Cancel
-                              </button>
+                      {!showDeleteConfirm ? (
+                        <div className="py-2">
+                          <button
+                            onClick={handleLogout}
+                            className="w-full px-5 py-3.5 flex items-center gap-3 text-left transition-colors group"
+                            style={{ 
+                              backgroundColor: 'transparent',
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 79, 0, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: 'rgba(255, 79, 0, 0.1)' }}>
+                              <LogOut style={{ width: '20px', height: '20px', color: 'var(--accent)' }} />
                             </div>
+                            <span className="text-sm font-display font-semibold uppercase tracking-wide" style={{ color: 'var(--charcoal)' }}>
+                              Logout
+                            </span>
+                          </button>
+
+                          {/* Delete Account Button */}
+                          <button
+                            onClick={() => setShowDeleteConfirm(true)}
+                            className="w-full px-5 py-3.5 flex items-center gap-3 text-left transition-colors group"
+                            style={{ backgroundColor: 'transparent' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+                              <Trash2 style={{ width: '20px', height: '20px', color: '#ef4444' }} />
+                            </div>
+                            <span className="text-sm font-display font-semibold uppercase tracking-wide" style={{ color: '#ef4444' }}>
+                              Delete Account
+                            </span>
+                          </button>
+                        </div>
+                      ) : (
+                        /* Delete Confirmation */
+                        <div className="px-5 py-4">
+                          <p className="text-sm font-medium mb-4 leading-relaxed" style={{ color: 'var(--charcoal)' }}>
+                            Are you sure you want to delete your account? This action cannot be undone.
+                          </p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleDeleteAccount}
+                              className="flex-1 px-4 py-2.5 bg-red-500 text-white text-xs font-display font-bold uppercase tracking-wide rounded-lg hover:bg-red-600 transition-colors shadow-sm"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => setShowDeleteConfirm(false)}
+                              className="flex-1 px-4 py-2.5 text-xs font-display font-bold uppercase tracking-wide rounded-lg transition-colors"
+                              style={{ backgroundColor: 'var(--grey-light)', color: 'var(--charcoal)' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--grey-medium)'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--grey-light)'}
+                            >
+                              Cancel
+                            </button>
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
