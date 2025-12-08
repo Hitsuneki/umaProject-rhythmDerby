@@ -41,6 +41,7 @@ interface GachaStore {
   multiPull: (count: number) => GachaPull[];
   getHistory: () => GachaPull[];
   getTemplate: (templateId: string) => any;
+  processDuplicate: (umaId: string, rarity: Rarity) => { type: 'shards' | 'limitBreak', amount: number };
 }
 
 export const useGachaStore = create<GachaStore>()(
@@ -97,6 +98,23 @@ export const useGachaStore = create<GachaStore>()(
 
       getTemplate: (templateId) => {
         return UMA_TEMPLATES[templateId as keyof typeof UMA_TEMPLATES];
+      },
+
+      processDuplicate: (umaId: string, rarity: Rarity) => {
+        // Convert duplicate into bond shards based on rarity
+        const shardAmounts: Record<Rarity, number> = {
+          common: 5,
+          rare: 10,
+          epic: 25,
+          legendary: 50,
+        };
+
+        const shardsGained = shardAmounts[rarity];
+
+        return {
+          type: 'shards',
+          amount: shardsGained,
+        };
       },
     }),
     {

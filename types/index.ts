@@ -22,6 +22,12 @@ export interface Uma {
   lastEnergyUpdate: number;
   comfortZone: number;
   createdAt: number;
+  // Duplicate handling fields
+  copiesOwned: number;
+  bondShards: number;
+  bondRank: number;
+  limitBreakLevel: number;
+  maxLimitBreak: number;
 }
 
 export interface TrainingLog {
