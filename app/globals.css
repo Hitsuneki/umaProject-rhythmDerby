@@ -1,26 +1,191 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Work+Sans:wght@300;400;500&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@layer base {
+  :root {
+    --background: #F0F0F0;
+    --foreground: #0A0A0A;
+    --charcoal: #1A1A1A;
+    --accent: #FF4F00;
+    --accent-light: #FF6E2A;
+    --accent-dark: #D54300;
+    --grey-light: #E8E8E8;
+    --grey-medium: #D0D0D0;
+    --grey-dark: #404040;
+    --border: rgba(26, 26, 26, 0.15);
+    --panel-bg: rgba(255, 255, 255, 0.92);
+    --shadow: rgba(10, 10, 10, 0.1);
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: 'Work Sans', sans-serif;
+    font-weight: 400;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-charcoal: var(--charcoal);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-accent-dark: var(--accent-dark);
+  --color-grey-light: var(--grey-light);
+  --color-grey-medium: var(--grey-medium);
+  --color-grey-dark: var(--grey-dark);
+  --color-border: var(--border);
+  --color-panel-bg: var(--panel-bg);
+  --color-shadow: var(--shadow);
+  
+  --font-display: 'Chakra Petch', sans-serif;
+  --font-body: 'Work Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer components {
+  .dot-grid-bg {
+    background-image: 
+      radial-gradient(circle, rgba(26, 26, 26, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .spotlight-beam {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .spotlight-beam::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -10%;
+    width: 120%;
+    height: 200%;
+    background: linear-gradient(
+      135deg,
+      transparent 0%,
+      rgba(255, 79, 0, 0.03) 30%,
+      rgba(255, 79, 0, 0.08) 50%,
+      rgba(255, 79, 0, 0.03) 70%,
+      transparent 100%
+    );
+    transform: rotate(-15deg);
+    pointer-events: none;
+  }
+
+  .panel {
+    background: var(--panel-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background: var(--accent-light);
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(255, 79, 0, 0.3);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--charcoal);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: scale(1.02);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@utility stat-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.login-bg {
+  background: linear-gradient(135deg, #0A0A0A 0%, #1A1A1A 50%, #0A0A0A 100%);
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(59, 0, 219, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 70%, rgba(255, 79, 0, 0.05) 0%, transparent 50%),
+    radial-gradient(circle, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+  position: relative;
+}
+
+.login-bg::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 0%,
+    rgba(255, 79, 0, 0.03) 25%,
+    transparent 50%,
+    rgba(59, 0, 219, 0.03) 75%,
+    transparent 100%
+  );
+  animation: shimmer 15s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    opacity: 0.3;
+    transform: translateX(-100%);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translateX(100%);
+  }
 }
