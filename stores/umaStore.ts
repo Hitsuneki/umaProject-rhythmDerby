@@ -8,6 +8,10 @@ const ENERGY_REGEN_INTERVAL = 5 * 60 * 1000; // 5 minutes in ms
 interface UmaStore {
   umas: Uma[];
   selectedUmaId: string | null;
+  loading: boolean;
+  error: string | null;
+  fetchUmas: () => Promise<void>;
+  setUmas: (umas: Uma[]) => void;
   addUma: (uma: Omit<Uma, 'id' | 'createdAt' | 'lastEnergyUpdate' | 'copiesOwned' | 'bondShards' | 'bondRank' | 'limitBreakLevel' | 'maxLimitBreak'>) => void;
   addOrProcessDuplicate: (uma: Omit<Uma, 'id' | 'createdAt' | 'lastEnergyUpdate' | 'copiesOwned' | 'bondShards' | 'bondRank' | 'limitBreakLevel' | 'maxLimitBreak'>, rarity: string) => { isDuplicate: boolean; shardsGained?: number; limitBreakGained?: boolean };
   updateUma: (id: string, updates: Partial<Uma>) => void;
@@ -26,6 +30,29 @@ export const useUmaStore = create<UmaStore>()(
     (set, get) => ({
       umas: [],
       selectedUmaId: null,
+      loading: false,
+      error: null,
+
+      fetchUmas: async () => {
+        set({ loading: true, error: null });
+        try {
+          const response = await fetch('/api/uma');
+          if (!response.ok) {
+            throw new Error('Failed to fetch characters');
+          }
+          const data = await response.json();
+          set({ umas: data, loading: false });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to load characters',
+            loading: false 
+          });
+        }
+      },
+
+      setUmas: (umas) => {
+        set({ umas });
+      },
 
       addUma: (uma) => {
         const newUma: Uma = {

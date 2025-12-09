@@ -16,6 +16,7 @@ export async function GET() {
         name,
         temperament,
         style,
+        trait_code,
         level,
         speed,
         stamina,
@@ -24,8 +25,8 @@ export async function GET() {
         max_energy AS maxEnergy,
         created_at AS createdAt
       FROM uma_characters
-      WHERE user_id = ?
-      ORDER BY created_at DESC`,
+      WHERE user_id = ? AND is_retired = 0
+      ORDER BY created_at ASC`,
       [user.id],
     );
 
