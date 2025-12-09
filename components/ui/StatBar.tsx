@@ -12,32 +12,29 @@ export function StatBar({
   label, 
   value, 
   maxValue = 100, 
-  color = 'var(--accent)',
+  color = 'var(--accent-primary)',
   showValue = true 
 }: StatBarProps) {
   const percentage = Math.min((value / maxValue) * 100, 100);
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-display uppercase tracking-wider text-(--grey-dark)">
-          {label}
-        </span>
-        {showValue && (
-          <span className="stat-mono text-sm font-semibold text-(--charcoal)">
-            {value}/{maxValue}
-          </span>
-        )}
-      </div>
-      <div className="h-2 bg-(--grey-light) rounded-full overflow-hidden">
+    <div className="stat-bar">
+      <span className="stat-bar-label">{label}</span>
+      <div className="stat-bar-track">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
-          className="h-full rounded-full"
-          style={{ backgroundColor: color }}
+          style={{ 
+            height: '100%', 
+            background: color,
+            borderRadius: 'var(--radius-sm)'
+          }}
         />
       </div>
+      {showValue && (
+        <span className="stat-bar-value">{value}</span>
+      )}
     </div>
   );
 }

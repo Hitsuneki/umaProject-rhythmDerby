@@ -56,14 +56,14 @@ export function Modal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-modal)' }}>
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            className="modal-backdrop"
           />
 
           {/* Modal */}
@@ -71,21 +71,21 @@ export function Modal({
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className={`
-              relative w-full ${sizeClasses[size]} bg-white rounded-xl shadow-2xl
-              border border-gray-200 overflow-hidden
-            `}
+            transition={{ duration: 0.2 }}
+            className={`modal-content w-full ${sizeClasses[size]}`}
           >
             {/* Header */}
             {title && (
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <h2 className="text-display text-xl text-gray-900">{title}</h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
+              <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                <h2 className="display-font text-xl" style={{ color: 'var(--text-primary)' }}>
+                  {title}
+                </h2>
+                <button
                   onClick={onClose}
-                  icon={<X className="w-4 h-4" />}
-                />
+                  className="p-2 rounded hover:bg-gray-100 transition-colors"
+                >
+                  <X style={{ width: '20px', height: '20px', color: 'var(--text-secondary)' }} />
+                </button>
               </div>
             )}
 

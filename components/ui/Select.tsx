@@ -1,4 +1,5 @@
 import { SelectHTMLAttributes, forwardRef } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
@@ -9,25 +10,33 @@ interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   ({ label, error, options, className = '', ...props }, ref) => {
     return (
-      <div className="space-y-2">
+      <div className="w-full">
         {label && (
-          <label className="block text-sm font-display uppercase tracking-wide text-(--charcoal)">
+          <label className="block tech-label mb-2">
             {label}
           </label>
         )}
-        <select
-          ref={ref}
-          className={`w-full px-4 py-3 bg-white border-[1.5px] border-(--border) rounded-lg font-body text-sm text-(--foreground) focus:outline-none focus:border-(--accent) transition-colors ${className}`}
-          {...props}
-        >
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            ref={ref}
+            className={`input appearance-none pr-10 ${className}`}
+            {...props}
+          >
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown 
+            className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
+            style={{ width: '16px', height: '16px', color: 'var(--text-tertiary)' }}
+          />
+        </div>
         {error && (
-          <p className="text-xs text-red-500">{error}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--accent-danger)' }}>
+            {error}
+          </p>
         )}
       </div>
     );
