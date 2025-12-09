@@ -1,35 +1,44 @@
-import { ReactNode } from 'react';
+import { ReactNode, ButtonHTMLAttributes } from 'react';
 import { motion, HTMLMotionProps } from 'framer-motion';
 
 interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'children'> {
-  variant?: 'primary' | 'secondary' | 'danger';
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
   children: ReactNode;
   icon?: ReactNode;
 }
 
 export function Button({ 
   variant = 'primary', 
+  size = 'md',
   children, 
   icon,
   className = '',
+  disabled,
   ...props 
 }: ButtonProps) {
-  const baseClasses = 'inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 font-display text-sm font-semibold uppercase tracking-wide transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
-  
+  const sizeClasses = {
+    sm: 'px-4 py-2 text-xs',
+    md: 'px-6 py-3 text-sm',
+    lg: 'px-8 py-4 text-base',
+  };
+
   const variantClasses = {
-    primary: 'bg-(--accent) text-white hover:bg-(--accent-light) hover:shadow-lg hover:shadow-(--accent)/30',
-    secondary: 'bg-transparent text-(--charcoal) border-[1.5px] border-(--border) hover:border-(--accent) hover:text-(--accent)',
-    danger: 'bg-red-500 text-white hover:bg-red-600 hover:shadow-lg hover:shadow-red-500/30',
+    primary: 'btn-primary',
+    secondary: 'btn-secondary',
+    danger: 'btn-danger',
+    ghost: 'btn-ghost',
   };
 
   return (
     <motion.button
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className={`${baseClasses} ${variantClasses[variant]} ${className}`}
+      whileHover={!disabled ? { scale: 1.02 } : {}}
+      whileTap={!disabled ? { scale: 0.98 } : {}}
+      className={`btn ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
+      disabled={disabled}
       {...props}
     >
-      {icon && <span className="w-5 h-5">{icon}</span>}
+      {icon && <span className="w-5 h-5" style={{ width: '20px', height: '20px' }}>{icon}</span>}
       {children}
     </motion.button>
   );
