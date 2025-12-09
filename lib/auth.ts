@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
+import { query } from './db';
 
 const SESSION_COOKIE = 'uma_session';
 const SESSION_TTL = '7d';
@@ -73,3 +74,30 @@ export async function getCurrentUserId(request?: Request): Promise<string | null
   return null;
 }
 
+/**
+ * getCurrentUser
+ * - Uses the session token (via Next cookies or an optional Request) to determine the user id
+ * - Returns user object { id, username, email } or null
+ */
+export async function getCurrentUser(request?: Request): Promise<{ id: string; username?: string; email?: string } | null> {
+  const userId = await getCurrentUserId(request);
+  if (!userId) return null;
+
+  try {
+    const [rows] = await query('SELECT id, username, email FROM users WHERE id = ?', [userId]);
+    const users = rows as any[];
+    if (users.length === 0) return null;
+    const user = users[0];
+    return {
+      id: String(user.id),
+      username: user.username ?? undefined,
+      email: user.email ?? undefined,
+    };
+  } catch (err) {
+    // Log the error server-side; don't throw so callers get null on failure
+    // (This prevents build-time issues and keeps runtime routes robust)
+    // eslint-disable-next-line no-console
+    console.error('getCurrentUser error:', err);
+    return null;
+  }
+}
