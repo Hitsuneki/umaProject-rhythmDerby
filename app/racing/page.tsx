@@ -71,6 +71,7 @@ export default function RacingPage() {
   const [offBeatClicks, setOffBeatClicks] = useState(0);
   
   const [result, setResult] = useState<{ placement: number; score: number; time: number } | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchUmas = async () => {
@@ -126,67 +127,86 @@ export default function RacingPage() {
   const startRacing = (distance: DistanceType) => {
     if (!currentUma) return;
     
-    const raceConfig = RACE_DISTANCES[distance];
-    const zones = generateTrackZones(raceConfig.distance);
-    
-    // Create runners
-    const playerRunner: Runner = {
-      id: currentUma.id,
-      name: currentUma.name,
-      isPlayer: true,
-      lane: 1,
-      position: 0,
-      speed: currentUma.speed,
-      stamina: currentUma.stamina,
-      technique: currentUma.technique,
-      burstActive: false,
-      burstTimer: 0,
-    };
-
-    // Create AI runners
-    const aiRunners: Runner[] = [
-      {
-        id: 'ai1',
-        name: 'Rival A',
-        isPlayer: false,
-        lane: 0,
-        position: 0,
-        speed: 50 + Math.random() * 20,
-        stamina: 50 + Math.random() * 20,
-        technique: 50 + Math.random() * 20,
-        burstActive: false,
-        burstTimer: 0,
-      },
-      {
-        id: 'ai2',
-        name: 'Rival B',
-        isPlayer: false,
-        lane: 2,
-        position: 0,
-        speed: 50 + Math.random() * 20,
-        stamina: 50 + Math.random() * 20,
-        technique: 50 + Math.random() * 20,
-        burstActive: false,
-        burstTimer: 0,
-      },
-    ];
-
     setSelectedDistance(distance);
-    setIsRacing(true);
-    setRunners([playerRunner, ...aiRunners]);
-    setTrackZones(zones);
-    setTimeElapsed(0);
-    setPhase('start');
-    setBeatPosition(0);
-    setSweetZoneStart(0.4);
-    setCharge(0);
-    setGoodRhythm(0);
-    setOffBeatClicks(0);
-    setPhaseQualities([]);
-    setResult(null);
-    
-    startRace(currentUma.id, distance);
+    setCountdown(3);
   };
+
+  // Countdown effect
+  useEffect(() => {
+    if (countdown === null || !selectedDistance || !currentUma) return;
+
+    if (countdown === 0) {
+      // Start the actual race
+      setCountdown(null);
+      
+      const raceConfig = RACE_DISTANCES[selectedDistance];
+      const zones = generateTrackZones(raceConfig.distance);
+      
+      // Create runners
+      const playerRunner: Runner = {
+        id: currentUma.id,
+        name: currentUma.name,
+        isPlayer: true,
+        lane: 1,
+        position: 0,
+        speed: currentUma.speed,
+        stamina: currentUma.stamina,
+        technique: currentUma.technique,
+        burstActive: false,
+        burstTimer: 0,
+      };
+
+      // Create AI runners
+      const aiRunners: Runner[] = [
+        {
+          id: 'ai1',
+          name: 'Rival A',
+          isPlayer: false,
+          lane: 0,
+          position: 0,
+          speed: 50 + Math.random() * 20,
+          stamina: 50 + Math.random() * 20,
+          technique: 50 + Math.random() * 20,
+          burstActive: false,
+          burstTimer: 0,
+        },
+        {
+          id: 'ai2',
+          name: 'Rival B',
+          isPlayer: false,
+          lane: 2,
+          position: 0,
+          speed: 50 + Math.random() * 20,
+          stamina: 50 + Math.random() * 20,
+          technique: 50 + Math.random() * 20,
+          burstActive: false,
+          burstTimer: 0,
+        },
+      ];
+
+      setIsRacing(true);
+      setRunners([playerRunner, ...aiRunners]);
+      setTrackZones(zones);
+      setTimeElapsed(0);
+      setPhase('start');
+      setBeatPosition(0);
+      setSweetZoneStart(0.4);
+      setCharge(0);
+      setGoodRhythm(0);
+      setOffBeatClicks(0);
+      setPhaseQualities([]);
+      setResult(null);
+      
+      startRace(currentUma.id, selectedDistance);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown, selectedDistance, currentUma, generateTrackZones]);
 
   // Main race loop
   useEffect(() => {
@@ -502,7 +522,33 @@ export default function RacingPage() {
         </Card>
       ) : (
         <AnimatePresence mode="wait">
-          {!selectedDistance && !result && (
+          {countdown !== null && (
+            <motion.div
+              key="countdown"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+            >
+              <Card className="text-center py-20">
+                <motion.div
+                  key={countdown}
+                  initial={{ scale: 1.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <p className="text-sm font-display uppercase tracking-wide text-(--grey-dark) mb-4">
+                    Get Ready!
+                  </p>
+                  <p className="font-display text-9xl font-black text-(--accent)">
+                    {countdown}
+                  </p>
+                </motion.div>
+              </Card>
+            </motion.div>
+          )}
+
+          {!selectedDistance && !result && !countdown && (
           <motion.div
             key="distance-select"
             initial={{ opacity: 0 }}

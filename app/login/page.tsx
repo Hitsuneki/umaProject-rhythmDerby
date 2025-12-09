@@ -1,258 +1,599 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, ArrowRight, Zap, Wifi, Server, Activity, Shield } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/stores/authStore';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-
-const TIPS = [
-  "Tip: Hit the beat to charge, off-beat to switch lanes.",
-  "Tip: Train your Uma regularly to improve their stats.",
-  "Tip: Different racing styles excel at different distances.",
-  "Tip: Energy regenerates over time - plan your training sessions wisely.",
-  "Tip: Gacha pulls can reward you with rare Uma and valuable items.",
-];
+import { useResponsive } from '@/hooks/useResponsive';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuthStore();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const { isMobile } = useResponsive();
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [currentTip] = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (email: string, password: string) => {
     setIsLoading(true);
+    setError('');
 
     try {
-      const result = await login(email, password);
-      if (result.success) {
+      const success = await login(email, password);
+      if (success) {
         router.push('/');
       } else {
-        setError(result.message || 'Invalid credentials. Please try again.');
+        setError('AUTHENTICATION FAILED - INVALID CREDENTIALS');
       }
     } catch (err) {
-      setError('An error occurred. Please try again.');
+      setError('SYSTEM ERROR - CONNECTION TIMEOUT');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleDesktopSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await handleSubmit(formData.email, formData.password);
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
+  };
+
+  // Show mobile version on small screens
+  if (isMobile) {
+    return (
+      <MobileLogin 
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
+        error={error}
+      />
+    );
+  }
+
+  // Desktop version (existing code from above)
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 login-bg">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute top-20 left-10 w-64 h-64 bg-gradient-to-br from-[#FF4F00]/10 to-transparent rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
+    <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+      {/* Animated Background Grid */}
+      <div className="absolute inset-0 opacity-20">
+        <motion.div 
+          className="absolute inset-0 grid-pattern"
+          animate={{ 
+            backgroundPosition: ['0px 0px', '32px 32px'],
           }}
-          transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute bottom-20 right-10 w-96 h-96 bg-gradient-to-br from-[#3B00DB]/10 to-transparent rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.5, 0.3, 0.5],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
+          transition={{ 
+            duration: 20, 
+            repeat: Infinity, 
+            ease: 'linear' 
           }}
         />
       </div>
 
-      {/* Logo/Branding */}
+      {/* Scanline Effect */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="absolute top-8 left-8"
+        className="absolute inset-0 pointer-events-none"
+        initial={{ y: '-100vh' }}
+        animate={{ y: '100vh' }}
+        transition={{ 
+          duration: 8, 
+          repeat: Infinity, 
+          ease: 'linear' 
+        }}
       >
-        <h2 className="font-display text-xl font-bold text-white tracking-wider">
-          Uma Project: <span className="text-[#FF4F00]">Rhythm Derby</span>
-        </h2>
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
       </motion.div>
 
-      {/* Login Card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className="relative w-full max-w-md"
-      >
-        {/* Decorative corner accents */}
-        <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 border-[#FF4F00]" />
-        <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 border-[#FF4F00]" />
-        <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 border-[#FF4F00]" />
-        <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 border-[#FF4F00]" />
+      {/* Ambient Data Streams */}
+      <div className="absolute top-0 left-0 w-full h-1 overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"
+          animate={{ 
+            x: ['-100%', '200%'],
+          }}
+          transition={{ 
+            duration: 6, 
+            repeat: Infinity, 
+            ease: 'easeInOut' 
+          }}
+        />
+      </div>
+      
+      <div className="absolute bottom-0 right-0 w-full h-1 overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-l from-transparent via-orange-500/40 to-transparent"
+          animate={{ 
+            x: ['100%', '-200%'],
+          }}
+          transition={{ 
+            duration: 8, 
+            repeat: Infinity, 
+            ease: 'easeInOut',
+            delay: 2
+          }}
+        />
+      </div>
 
-        <div className="login-card backdrop-blur-xl bg-[#1A1A1A]/95 border border-[#FF4F00]/30 rounded-2xl p-8 shadow-2xl shadow-[#FF4F00]/10">
-          {/* Title */}
-          <div className="text-center mb-8">
-            <motion.h1
-              initial={{ opacity: 0, y: -10 }}
+      <div className="relative z-10 min-h-screen flex">
+        {/* Left Panel - System Status */}
+        <motion.div 
+          className="hidden lg:flex lg:w-1/2 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex-col justify-center p-12 relative"
+          initial={{ opacity: 0, x: -50 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+        >
+          {/* Vertical Data Stream */}
+          <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
+            <motion.div
+              className="w-full bg-gradient-to-b from-transparent via-cyan-500/30 to-transparent h-32"
+              animate={{ 
+                y: ['-100%', '400%'],
+              }}
+              transition={{ 
+                duration: 4, 
+                repeat: Infinity, 
+                ease: 'linear' 
+              }}
+            />
+          </div>
+
+          <div className="space-y-8">
+            {/* System Header */}
+            <motion.div 
+              className="space-y-4"
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="font-display text-4xl font-bold text-white mb-2 tracking-wider"
-            >
-              RHYTHM DERBY
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="text-[#D0D0D0] text-sm tracking-wide"
             >
-              Mini Uma Stable Login
-            </motion.p>
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email Input */}
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D0D0D0]">
-                <Mail size={20} />
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-gradient-to-br from-cyan-600 to-cyan-700 flex items-center justify-center shadow-lg border border-cyan-500/20">
+                  <Zap className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="font-mono text-3xl text-gray-900 font-black uppercase tracking-wider">
+                    RHYTHMDERBY
+                  </h1>
+                  <p className="text-xs text-gray-500 uppercase tracking-widest font-mono font-semibold">
+                    NEURAL RHYTHM INTERFACE v2.4.1
+                  </p>
+                </div>
               </div>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Email / Username"
-                required
-                className="w-full pl-12 pr-4 py-3.5 bg-[#0A0A0A]/50 border border-[#404040] rounded-lg text-white placeholder:text-[#808080] focus:outline-none focus:border-[#FF4F00] focus:ring-2 focus:ring-[#FF4F00]/20 transition-all"
-              />
-            </div>
+              
+              <div className="h-px bg-gradient-to-r from-cyan-500/50 via-cyan-500/20 to-transparent" />
+            </motion.div>
 
-            {/* Password Input */}
-            <div className="relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#D0D0D0]">
-                <Lock size={20} />
+            {/* System Status Grid */}
+            <motion.div 
+              className="space-y-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono font-bold mb-4 border-b border-gray-200 pb-2">
+                  [SYS-STATUS] CORE MODULES
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <motion.div 
+                          className="w-2 h-2 bg-green-500 rounded-full"
+                          animate={{ opacity: [1, 0.5, 1] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                        <span className="text-xs font-mono text-gray-700 uppercase">AUTH</span>
+                      </div>
+                      <span className="text-xs font-mono text-green-600 font-bold">ONLINE</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Server className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-mono text-gray-700 uppercase">DB</span>
+                      </div>
+                      <span className="text-xs font-mono text-green-600 font-bold">SYNC</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Wifi className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-mono text-gray-700 uppercase">NET</span>
+                      </div>
+                      <span className="text-xs font-mono text-cyan-600 font-bold">18MS</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Activity className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-mono text-gray-700 uppercase">CPU</span>
+                      </div>
+                      <span className="text-xs font-mono text-yellow-600 font-bold">23%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs font-mono text-gray-700 uppercase">SEC</span>
+                      </div>
+                      <span className="text-xs font-mono text-green-600 font-bold">TLS</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 border border-gray-400 bg-gray-100" />
+                        <span className="text-xs font-mono text-gray-700 uppercase">MEM</span>
+                      </div>
+                      <span className="text-xs font-mono text-cyan-600 font-bold">2.1GB</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
-                required
-                className="w-full pl-12 pr-12 py-3.5 bg-[#0A0A0A]/50 border border-[#404040] rounded-lg text-white placeholder:text-[#808080] focus:outline-none focus:border-[#FF4F00] focus:ring-2 focus:ring-[#FF4F00]/20 transition-all"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#D0D0D0] hover:text-[#FF4F00] transition-colors"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
 
-            {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-[#404040] bg-[#0A0A0A]/50 text-[#FF4F00] focus:ring-[#FF4F00] focus:ring-offset-0"
-                />
-                <span className="text-[#D0D0D0] group-hover:text-white transition-colors">
-                  Remember me
-                </span>
-              </label>
-              <button
-                type="button"
-                className="text-[#FF4F00] hover:text-[#FF6E2A] transition-colors font-medium"
-              >
-                Forgot password?
-              </button>
-            </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-widest font-mono font-bold mb-4 border-b border-gray-200 pb-2">
+                  [NODE-INFO] DEPLOYMENT
+                </p>
+                <div className="space-y-2 text-xs font-mono text-gray-600">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">REGION:</span>
+                    <span className="text-gray-900 font-bold">GLOBAL-EAST-01</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">BUILD:</span>
+                    <span className="text-gray-900 font-bold">RD-2024.03.15</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">UPTIME:</span>
+                    <span className="text-green-600 font-bold">99.97%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">LOAD:</span>
+                    <span className="text-cyan-600 font-bold">OPTIMAL</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
 
-            {/* Error Message */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm text-center"
-              >
-                {error}
-              </motion.div>
-            )}
-
-            {/* Login Button */}
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-[#FF4F00] to-[#ED1B24] hover:from-[#FF6E2A] hover:to-[#FF4F00] text-white font-display font-bold text-base py-4 rounded-full shadow-lg shadow-[#FF4F00]/30 hover:shadow-[#FF4F00]/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* Neural Activity Visualization */}
+            <motion.div 
+              className="relative"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
             >
-              {isLoading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                    className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
-                  />
-                  Logging in...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  LOG IN
-                  <ArrowRight size={20} />
-                </span>
-              )}
-            </Button>
-          </form>
-
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-[#404040]" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-[#1A1A1A] text-[#808080]">OR</span>
-            </div>
+              <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 overflow-hidden relative">
+                <div className="absolute inset-0 flex items-end justify-center gap-1 p-2">
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="w-1 bg-cyan-500/40 min-h-1"
+                      animate={{ 
+                        height: [4, Math.random() * 60 + 8, 4],
+                        opacity: [0.4, 0.8, 0.4]
+                      }}
+                      transition={{ 
+                        duration: 1.5 + Math.random() * 2,
+                        repeat: Infinity,
+                        delay: Math.random() * 2,
+                        ease: 'easeInOut'
+                      }}
+                    />
+                  ))}
+                </div>
+                <div className="absolute top-2 left-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider font-mono">
+                    NEURAL SYNC
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-400 uppercase tracking-widest font-mono mt-2 text-center">
+                [BIOMETRIC] PATTERN ANALYSIS
+              </p>
+            </motion.div>
           </div>
+        </motion.div>
 
-          {/* Create Account */}
-          <div className="text-center">
-            <p className="text-[#D0D0D0] text-sm mb-3">
-              New Trainer?
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push('/register')}
-              className="w-full py-3 border-2 border-[#FF4F00] text-[#FF4F00] hover:bg-[#FF4F00] hover:text-white font-display font-semibold rounded-full transition-all duration-300"
-            >
-              CREATE ACCOUNT
-            </button>
-          </div>
+        {/* Right Panel - Login Form */}
+        <div className="flex-1 flex items-center justify-center p-6 lg:p-12 relative">
+          {/* Vertical Accent Line */}
+          <div className="absolute left-0 top-0 w-1 h-full bg-gradient-to-b from-transparent via-orange-500/20 to-transparent lg:hidden" />
 
-          {/* Tip */}
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-6 p-4 bg-[#0A0A0A]/30 border border-[#404040]/50 rounded-lg"
+            initial={{ opacity: 0, y: 40, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.5, ease: 'easeOut', delay: 0.3 }}
+            className="w-full max-w-md relative"
           >
-            <p className="text-[#D0D0D0] text-xs text-center italic">
-              {currentTip}
-            </p>
+            {/* Login Card */}
+            <div className="bg-white border border-gray-200 shadow-lg overflow-hidden relative">
+              {/* Ambient Side Accent */}
+              <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
+                <motion.div
+                  className="w-full bg-gradient-to-b from-cyan-500/30 via-transparent to-orange-500/30 h-full"
+                  animate={{ 
+                    backgroundPosition: ['0% 0%', '0% 100%'],
+                  }}
+                  transition={{ 
+                    duration: 3, 
+                    repeat: Infinity, 
+                    ease: 'easeInOut' 
+                  }}
+                />
+              </div>
+
+              {/* Card Header */}
+              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 relative">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase tracking-widest font-mono font-bold">
+                      MODULE: AUTH / CHANNEL: OPERATOR
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.div 
+                      className="w-2 h-2 bg-green-500 rounded-full"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                    <span className="text-xs font-mono text-gray-600 font-bold uppercase">SECURE</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Content */}
+              <div className="p-6 space-y-6 relative">
+                {/* Title Section */}
+                <motion.div 
+                  className="text-center space-y-3"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
+                  <h2 className="font-mono text-2xl text-gray-900 font-black uppercase tracking-wider">
+                    WELCOME BACK, TRAINER
+                  </h2>
+                  <p className="text-sm text-gray-600 font-medium">
+                    Enter your credentials to access the neural
+                    rhythm interface.
+                  </p>
+                  <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent" />
+                </motion.div>
+
+                {/* Error Display */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      className="bg-red-50 border-l-4 border-red-500 p-4 relative"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="w-5 h-5 border-2 border-red-500 bg-red-100 flex items-center justify-center mt-0.5">
+                          <div className="w-1 h-1 bg-red-500 rounded-full" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-red-700 font-mono font-bold uppercase tracking-wide">
+                            AUTHENTICATION ERROR
+                          </p>
+                          <p className="text-xs text-red-600 font-mono mt-1">
+                            {error}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Login Form */}
+                <motion.form 
+                  onSubmit={handleDesktopSubmit} 
+                  className="space-y-5"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.6 }}
+                >
+                  {/* Email Field */}
+                  <div className="space-y-2">
+                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                      OPERATOR EMAIL
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        onFocus={() => setFocusedField('email')}
+                        onBlur={() => setFocusedField(null)}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        placeholder="trainer@rhythmderby.com"
+                        required
+                      />
+                      {focusedField === 'email' && (
+                        <motion.div
+                          className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )}
+                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center">
+                        <div className="w-1 h-4 bg-gray-300" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Password Field */}
+                  <div className="space-y-2">
+                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                      ACCESS CODE
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        onFocus={() => setFocusedField('password')}
+                        onBlur={() => setFocusedField(null)}
+                        className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        placeholder="••••••••••••••••"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                      {focusedField === 'password' && (
+                        <motion.div
+                          className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ duration: 0.3 }}
+                        />
+                      )}
+                      <div className="absolute top-0 right-12 w-1 h-full flex items-center">
+                        <div className="w-full h-4 bg-gray-300" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <motion.button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-mono font-bold py-4 px-6 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 text-sm uppercase tracking-wide relative overflow-hidden group"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    {/* Button shine effect */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{ x: ['-100%', '200%'] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
+                    />
+                    
+                    {/* Button content */}
+                    {isLoading ? (
+                      <div className="flex items-center justify-center gap-3">
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        <span>AUTHENTICATING...</span>
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((i) => (
+                            <motion.div
+                              key={i}
+                              className="w-1 h-1 bg-white rounded-full"
+                              animate={{ opacity: [0.3, 1, 0.3] }}
+                              transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-3 relative z-10">
+                        <span>INITIATE LOGIN SEQUENCE</span>
+                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      </div>
+                    )}
+                  </motion.button>
+                </motion.form>
+
+                {/* Secondary Actions */}
+                <motion.div 
+                  className="space-y-4 pt-4 border-t border-gray-200"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                >
+                  <div className="flex flex-col sm:flex-row gap-3 text-center">
+                    <Link 
+                      href="/register" 
+                      className="flex-1 text-xs text-gray-600 hover:text-cyan-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-cyan-600 bg-gray-50 hover:bg-cyan-50"
+                    >
+                      [REG] CREATE NEW OPERATOR
+                    </Link>
+                    <Link 
+                      href="/forgot-password" 
+                      className="flex-1 text-xs text-gray-600 hover:text-orange-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-orange-600 bg-gray-50 hover:bg-orange-50"
+                    >
+                      [RESET] RECOVER ACCESS
+                    </Link>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Card Footer */}
+              <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 relative">
+                <div className="flex items-center justify-between text-xs font-mono text-gray-500">
+                  <div className="flex items-center gap-4">
+                    <span className="uppercase">BUILD: RD-2024.03.15</span>
+                    <span className="uppercase">NODE: CN-01</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <motion.div 
+                      className="w-1 h-1 bg-green-500 rounded-full"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    />
+                    <span className="uppercase">SECURE</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Security Footer */}
+            <motion.div 
+              className="mt-6 text-center space-y-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1 }}
+            >
+              <p className="text-xs text-gray-400 uppercase tracking-wide font-mono font-bold">
+                SECURE NEURAL CONNECTION ESTABLISHED
+              </p>
+              <div className="flex items-center justify-center gap-4 text-xs font-mono text-gray-500">
+                <div className="flex items-center gap-2">
+                  <motion.div 
+                    className="w-1 h-1 bg-green-500 rounded-full"
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  />
+                  <span className="uppercase">SSL ENCRYPTED</span>
+                </div>
+                <div className="w-px h-3 bg-gray-300" />
+                <div className="flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  <span className="uppercase">TLS 1.3</span>
+                </div>
+                <div className="w-px h-3 bg-gray-300" />
+                <span className="uppercase">256-BIT</span>
+              </div>
+            </motion.div>
           </motion.div>
         </div>
-      </motion.div>
+      </div>
+
+      {/* Additional CSS for grid pattern */}
+      <style jsx>{`
+        .grid-pattern {
+          background-image: 
+            linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+          background-size: 32px 32px;
+        }
+      `}</style>
     </div>
   );
 }
