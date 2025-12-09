@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getConnection, query } from '@/lib/db';
-
-const DEMO_USER_ID = 1;
+import { getCurrentUser } from '@/lib/auth';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const [rows] = await query(
       `SELECT 
@@ -22,7 +24,7 @@ export async function GET() {
       FROM training_sessions
       WHERE user_id = ?
       ORDER BY created_at DESC`,
-      [DEMO_USER_ID],
+      [user.id],
     );
 
     return NextResponse.json(rows);

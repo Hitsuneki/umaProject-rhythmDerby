@@ -37,6 +37,8 @@ export default function TrainingPage() {
   const [charge, setCharge] = useState(0);
   const [burstActive, setBurstActive] = useState(false);
   const [result, setResult] = useState<{ quality: number; gains: any; label: string } | null>(null);
+  const [lastFeedback, setLastFeedback] = useState<'good' | 'miss' | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -113,6 +115,7 @@ export default function TrainingPage() {
 
     if (isOnBeat) {
       // On-beat: Good rhythm
+      setLastFeedback('good');
       setGoodRhythm((prev) => prev + 1);
       setCharge((prev) => {
         const newCharge = Math.min(MAX_CHARGE, prev + 1);
@@ -127,10 +130,18 @@ export default function TrainingPage() {
       });
     } else {
       // Off-beat: Miss
+      setLastFeedback('miss');
       setMissRhythm((prev) => prev + 1);
       // Small penalty: lose some charge
       setCharge((prev) => Math.max(0, prev - 0.5));
     }
+
+    // Show feedback animation
+    setShowFeedback(true);
+    setTimeout(() => {
+      setShowFeedback(false);
+      setLastFeedback(null);
+    }, 500);
   };
 
   const triggerBurst = () => {
@@ -396,42 +407,95 @@ export default function TrainingPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-display uppercase tracking-wide text-(--grey-dark)">
-                      Rhythm Bar
+                      Rhythm Bar - Click when marker enters GREEN zone
                     </p>
                     <div className="flex items-center gap-4 text-xs stat-mono">
-                      <span className="text-green-600">Good: {goodRhythm}</span>
-                      <span className="text-red-600">Miss: {missRhythm}</span>
+                      <span className="text-green-600 font-bold">✓ Good: {goodRhythm}</span>
+                      <span className="text-red-600 font-bold">✗ Miss: {missRhythm}</span>
                     </div>
                   </div>
                   
-                  <div className="relative h-12 bg-(--grey-light) rounded-lg overflow-hidden">
+                  <div 
+                    className="relative h-16 rounded-lg overflow-hidden transition-all duration-200"
+                    style={{
+                      background: showFeedback 
+                        ? lastFeedback === 'good' 
+                          ? 'rgba(34, 197, 94, 0.2)' 
+                          : 'rgba(239, 68, 68, 0.2)'
+                        : 'var(--grey-light)',
+                      boxShadow: showFeedback
+                        ? lastFeedback === 'good'
+                          ? '0 0 20px rgba(34, 197, 94, 0.5)'
+                          : '0 0 20px rgba(239, 68, 68, 0.5)'
+                        : 'none'
+                    }}
+                  >
+                    {/* Beat Tick Marks */}
+                    {[0, 25, 50, 75].map((pos) => (
+                      <div
+                        key={pos}
+                        className="absolute top-0 bottom-0 w-px bg-(--grey-medium) opacity-30"
+                        style={{ left: `${pos}%` }}
+                      />
+                    ))}
+
                     {/* Sweet Zone */}
                     <motion.div
-                      className="absolute h-full bg-green-300/50 border-l-2 border-r-2 border-green-500"
+                      className="absolute h-full bg-green-400/70 border-l-4 border-r-4 border-green-600"
                       style={{
                         left: `${sweetZoneStartPercent}%`,
                         width: `${ON_BEAT_WINDOW * 100}%`,
                       }}
                       animate={{
                         left: `${sweetZoneStartPercent}%`,
+                        opacity: [0.7, 0.9, 0.7],
                       }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ 
+                        left: { duration: 0.3 },
+                        opacity: { duration: 1, repeat: Infinity }
+                      }}
                     />
                     
                     {/* Beat Marker */}
                     <motion.div
-                      className="absolute top-0 bottom-0 w-1 bg-(--accent) shadow-lg"
-                      style={{ left: `${beatPositionPercent}%` }}
-                      animate={{ left: `${beatPositionPercent}%` }}
-                      transition={{ duration: 0 }}
+                      className="absolute top-0 bottom-0 w-2 bg-cyan-400 shadow-lg z-10"
+                      style={{ 
+                        left: `${beatPositionPercent}%`,
+                        boxShadow: '0 0 10px rgba(34, 211, 238, 0.8), 0 0 20px rgba(34, 211, 238, 0.4)'
+                      }}
+                      animate={{ 
+                        left: `${beatPositionPercent}%`,
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{ 
+                        left: { duration: 0 },
+                        scale: { duration: 0.3, repeat: Infinity }
+                      }}
                     />
                     
-                    {/* Labels */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-display text-(--grey-dark)">
-                        Click when marker is in green zone
-                      </span>
-                    </div>
+                    {/* Feedback Text */}
+                    <AnimatePresence>
+                      {showFeedback && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.5, y: -10 }}
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                        >
+                          <span 
+                            className="font-display text-4xl font-black tracking-wider"
+                            style={{
+                              color: lastFeedback === 'good' ? '#22c55e' : '#ef4444',
+                              textShadow: lastFeedback === 'good' 
+                                ? '0 0 20px rgba(34, 197, 94, 0.8)'
+                                : '0 0 20px rgba(239, 68, 68, 0.8)'
+                            }}
+                          >
+                            {lastFeedback === 'good' ? 'GOOD!' : 'MISS!'}
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 

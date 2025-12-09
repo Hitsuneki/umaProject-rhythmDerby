@@ -51,6 +51,7 @@ export default function RacingPage() {
   const umaId = searchParams.get('id');
 
   const [currentUma, setCurrentUma] = useState<Uma | null>(null);
+  const [availableUmas, setAvailableUmas] = useState<Uma[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDistance, setSelectedDistance] = useState<DistanceType | null>(null);
@@ -72,26 +73,28 @@ export default function RacingPage() {
   const [result, setResult] = useState<{ placement: number; score: number; time: number } | null>(null);
 
   useEffect(() => {
-    if (!umaId) {
-      setError('No Uma selected');
-      setLoading(false);
-      return;
-    }
-
-    const fetchUma = async () => {
+    const fetchUmas = async () => {
       try {
-        const response = await fetch(`/api/uma/${umaId}`);
-        if (!response.ok) throw new Error('Failed to fetch Uma');
+        const response = await fetch('/api/uma');
+        if (!response.ok) throw new Error('Failed to fetch Umas');
         const data = await response.json();
-        setCurrentUma(data);
+        setAvailableUmas(data);
+        
+        // Auto-select from URL param or first character
+        if (umaId) {
+          const uma = data.find((u: Uma) => u.id === umaId);
+          if (uma) setCurrentUma(uma);
+        } else if (data.length > 0) {
+          setCurrentUma(data[0]);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load Uma');
+        setError(err instanceof Error ? err.message : 'Failed to load Umas');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUma();
+    fetchUmas();
   }, [umaId]);
 
   // Generate track zones
@@ -434,25 +437,9 @@ export default function RacingPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-(--accent) mx-auto mb-4"></div>
-          <p className="text-(--grey-dark)">Loading Uma...</p>
+          <p className="text-(--grey-dark)">Loading...</p>
         </div>
       </div>
-    );
-  }
-
-  if (error || !currentUma) {
-    return (
-      <Card className="text-center py-16">
-        <h2 className="font-display text-2xl font-bold mb-4 text-(--charcoal)">
-          No Uma Selected
-        </h2>
-        <p className="text-(--grey-dark) mb-6">
-          Please select an Uma from your stable first
-        </p>
-        <Button variant="primary" onClick={() => router.push('/characters')}>
-          Go to Characters
-        </Button>
-      </Card>
     );
   }
 
@@ -472,10 +459,50 @@ export default function RacingPage() {
             </p>
           </div>
         </div>
+        
+        {/* Character Selector */}
+        <div className="flex items-center gap-3">
+          <div>
+            <label className="text-xs text-(--grey-dark) block mb-1">Select Uma</label>
+            <select
+              value={currentUma?.id || ''}
+              onChange={(e) => {
+                const uma = availableUmas.find(u => u.id === e.target.value);
+                setCurrentUma(uma || null);
+              }}
+              className="px-4 py-2 border border-(--border) rounded-lg font-display text-sm bg-white text-(--charcoal) focus:outline-none focus:ring-2 focus:ring-(--accent)"
+            >
+              <option value="">Select Uma...</option>
+              {availableUmas.map((uma) => (
+                <option key={uma.id} value={uma.id}>
+                  {uma.name} - {uma.style} Lv.{uma.level}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Button 
+            variant="secondary" 
+            className="mt-5"
+            onClick={() => router.push('/characters')}
+          >
+            Manage
+          </Button>
+        </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {!selectedDistance && !result && (
+      {!currentUma ? (
+        <Card className="text-center py-12">
+          <User className="w-16 h-16 mx-auto mb-4 text-(--grey-medium)" />
+          <h2 className="font-display text-xl font-bold mb-2 text-(--charcoal)">
+            No Uma Selected
+          </h2>
+          <p className="text-(--grey-dark) mb-4">
+            Please select an Uma from the dropdown above to start racing
+          </p>
+        </Card>
+      ) : (
+        <AnimatePresence mode="wait">
+          {!selectedDistance && !result && (
           <motion.div
             key="distance-select"
             initial={{ opacity: 0 }}
@@ -766,6 +793,7 @@ export default function RacingPage() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
     </div>
   );
 }

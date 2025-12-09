@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getConnection, query } from '@/lib/db';
-
-const DEMO_USER_ID = 1;
+import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const [raceRows] = await query(
       `SELECT 
@@ -20,7 +22,7 @@ export async function GET() {
       FROM races
       WHERE user_id = ?
       ORDER BY created_at DESC`,
-      [DEMO_USER_ID],
+      [user.id],
     );
 
     const raceIds = (raceRows as any[]).map((r) => r.id);
@@ -65,6 +67,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   const body = await request.json();
   const {
     umaId,
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
         (user_id, uma_id, distance_type, start_quality, mid_quality, final_quality, overall_quality, race_score, placement, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
-        DEMO_USER_ID,
+        user.id,
         umaId,
         distanceType,
         startQuality,
@@ -122,7 +127,7 @@ export async function POST(request: Request) {
           Number(p.technique ?? 0),
           p.lanePath ?? '',
           Number(p.finalPos ?? 0),
-          DEMO_USER_ID,
+          user.id,
         );
       });
 

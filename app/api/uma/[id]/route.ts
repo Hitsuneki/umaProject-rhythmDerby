@@ -5,9 +5,11 @@ import { getCurrentUser } from '@/lib/auth';
 const DEFAULT_TRAIT = 'all_rounder';
 const DEFAULT_COMFORT = 50;
 
-export async function GET(_request: Request, { params }: { params: { id: string } }) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+  const { id } = await params;
 
   try {
     const [rows] = await query(
@@ -25,7 +27,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         created_at AS createdAt
       FROM uma_characters
       WHERE id = ? AND user_id = ?`,
-      [params.id, user.id],
+      [id, user.id],
     );
 
     const uma = (rows as any[])[0];
@@ -52,9 +54,11 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+  const { id } = await params;
 
   try {
     const body = await request.json();
@@ -85,7 +89,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    values.push(params.id, user.id);
+    values.push(id, user.id);
 
     await query(`UPDATE uma_characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, values);
 
@@ -96,12 +100,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
+  const { id } = await params;
+
   try {
-    await query(`DELETE FROM uma_characters WHERE id = ? AND user_id = ?`, [params.id, user.id]);
+    await query(`DELETE FROM uma_characters WHERE id = ? AND user_id = ?`, [id, user.id]);
     return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
     console.error('DELETE /api/uma/[id] error', error);
