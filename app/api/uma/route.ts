@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
-const DEMO_USER_ID = 1;
+const DEFAULT_TRAIT = 'all_rounder';
+const DEFAULT_COMFORT = 50;
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const [rows] = await query(
       `SELECT 
@@ -11,24 +16,23 @@ export async function GET() {
         name,
         temperament,
         style,
-        trait,
         level,
         speed,
         stamina,
         technique,
         energy,
         max_energy AS maxEnergy,
-        comfort_zone AS comfortZone,
-        last_energy_update AS lastEnergyUpdate,
         created_at AS createdAt
       FROM uma_characters
       WHERE user_id = ?
       ORDER BY created_at DESC`,
-      [DEMO_USER_ID],
+      [user.id],
     );
 
     const umas = (rows as any[]).map((row) => ({
       ...row,
+      trait: row.trait_code ?? DEFAULT_TRAIT,
+      comfortZone: row.comfortZone ?? DEFAULT_COMFORT,
       id: String(row.id),
       createdAt: row.createdAt ? new Date(row.createdAt).getTime() : Date.now(),
       lastEnergyUpdate: row.lastEnergyUpdate
@@ -49,35 +53,71 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json();
+    // Log request body for debugging (avoid leaking secrets; this is controlled input)
+    console.log('CREATE UMA BODY:', body);
+
     const { name, temperament, style, trait, speed, stamina, technique } = body;
 
-    if (!name || !temperament || !style || !trait) {
+    if (!name || !temperament || !style) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
     }
+
+    type UmaStyle = 'Front' | 'Mid' | 'Back';
+    const allowedStyles: UmaStyle[] = ['Front', 'Mid', 'Back'];
+    const allowedTemps = ['calm', 'energetic', 'stubborn', 'gentle'];
+
+    // Map UI labels to DB enum values
+    const styleMap: Record<string, UmaStyle> = {
+      runner: 'Front',
+      pacemaker: 'Front',
+      front: 'Front',
+      leader: 'Mid',
+      chaser: 'Mid',
+      stalker: 'Mid',
+      normal: 'Mid',
+      mid: 'Mid',
+      closer: 'Back',
+      last: 'Back',
+      back: 'Back',
+    };
 
     const level = Number(body.level ?? 1);
     const energy = Number(body.energy ?? 100);
     const maxEnergy = Number(body.maxEnergy ?? 100);
-    const comfortZone = Number(body.comfortZone ?? 50);
+    const comfortZone = Number(body.comfortZone ?? DEFAULT_COMFORT);
+    const safeTrait = trait ?? DEFAULT_TRAIT;
+    const mappedStyle = styleMap[String(style).toLowerCase()] ?? null;
+    const safeStyle: UmaStyle | null =
+      mappedStyle && allowedStyles.includes(mappedStyle) ? mappedStyle : null;
+    const safeTemperament = allowedTemps.includes(temperament) ? temperament : 'calm';
+
+    if (!safeStyle) {
+      console.warn('INVALID STYLE:', style);
+      return NextResponse.json({ message: 'Invalid style' }, { status: 400 });
+    }
 
     const [result]: any = await query(
       `INSERT INTO uma_characters
-        (user_id, name, temperament, style, trait, level, speed, stamina, technique, energy, max_energy, comfort_zone, created_at, last_energy_update)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        (user_id, name, temperament, style, trait_code, level, exp, speed, stamina, technique, energy, max_energy, last_energy_at, is_retired, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, NOW())`,
       [
-        DEMO_USER_ID,
+        user.id,
         name,
-        temperament,
-        style,
-        trait,
+        safeTemperament,
+        safeStyle,
+        safeTrait,
+        Number(level ?? 1),
+        0, // exp
         Number(speed ?? 0),
         Number(stamina ?? 0),
         Number(technique ?? 0),
         energy,
         maxEnergy,
-        comfortZone,
       ],
     );
 
@@ -87,7 +127,7 @@ export async function POST(request: Request) {
         name,
         temperament,
         style,
-        trait,
+        trait: safeTrait,
         level,
         speed: Number(speed ?? 0),
         stamina: Number(stamina ?? 0),

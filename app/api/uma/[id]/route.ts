@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getCurrentUser } from '@/lib/auth';
 
-const DEMO_USER_ID = 1;
+const DEFAULT_TRAIT = 'all_rounder';
+const DEFAULT_COMFORT = 50;
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const [rows] = await query(
       `SELECT 
@@ -11,19 +16,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         name,
         temperament,
         style,
-        trait,
         level,
         speed,
         stamina,
         technique,
         energy,
         max_energy AS maxEnergy,
-        comfort_zone AS comfortZone,
-        last_energy_update AS lastEnergyUpdate,
         created_at AS createdAt
       FROM uma_characters
       WHERE id = ? AND user_id = ?`,
-      [params.id, DEMO_USER_ID],
+      [params.id, user.id],
     );
 
     const uma = (rows as any[])[0];
@@ -33,6 +35,8 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 
     return NextResponse.json({
       ...uma,
+      trait: uma.trait_code ?? DEFAULT_TRAIT,
+      comfortZone: uma.comfortZone ?? DEFAULT_COMFORT,
       id: String(uma.id),
       createdAt: uma.createdAt ? new Date(uma.createdAt).getTime() : Date.now(),
       lastEnergyUpdate: uma.lastEnergyUpdate ? new Date(uma.lastEnergyUpdate).getTime() : Date.now(),
@@ -49,20 +53,21 @@ export async function GET(_request: Request, { params }: { params: { id: string 
 }
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await request.json();
     const allowedFields = [
       'name',
       'temperament',
       'style',
-      'trait',
       'level',
       'speed',
       'stamina',
       'technique',
       'energy',
       'maxEnergy',
-      'comfortZone',
     ] as const;
 
     const updates: string[] = [];
@@ -70,7 +75,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
     allowedFields.forEach((field) => {
       if (field in body) {
-        const column = field === 'maxEnergy' ? 'max_energy' : field === 'comfortZone' ? 'comfort_zone' : field;
+        const column = field === 'maxEnergy' ? 'max_energy' : field;
         updates.push(`${column} = ?`);
         values.push(body[field]);
       }
@@ -80,7 +85,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
       return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
     }
 
-    values.push(params.id, DEMO_USER_ID);
+    values.push(params.id, user.id);
 
     await query(`UPDATE uma_characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, values);
 
@@ -92,8 +97,11 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 }
 
 export async function DELETE(_request: Request, { params }: { params: { id: string } }) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
-    await query(`DELETE FROM uma_characters WHERE id = ? AND user_id = ?`, [params.id, DEMO_USER_ID]);
+    await query(`DELETE FROM uma_characters WHERE id = ? AND user_id = ?`, [params.id, user.id]);
     return NextResponse.json({ message: 'Deleted' });
   } catch (error) {
     console.error('DELETE /api/uma/[id] error', error);

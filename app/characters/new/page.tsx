@@ -12,6 +12,13 @@ import { ArrowLeft, Save, User } from 'lucide-react';
 import Link from 'next/link';
 import type { Temperament, Style, Trait } from '@/types';
 
+type UmaStyleInternal = 'Front' | 'Mid' | 'Back';
+const styleOptions: { value: Style; label: string; mapped: UmaStyleInternal }[] = [
+  { value: 'runner', label: 'Runner', mapped: 'Front' },
+  { value: 'chaser', label: 'Chaser', mapped: 'Mid' },
+  { value: 'closer', label: 'Closer', mapped: 'Back' },
+];
+
 const STAT_BUDGET = 150;
 
 export default function NewCharacterPage() {
@@ -58,6 +65,7 @@ export default function NewCharacterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
+          style: styleOptions.find((opt) => opt.value === formData.style)?.mapped ?? 'Front',
           level: 1,
           energy: 100,
           maxEnergy: 100,
@@ -134,12 +142,7 @@ export default function NewCharacterPage() {
                 label="Racing Style"
                 value={formData.style}
                 onChange={(e) => setFormData({ ...formData, style: e.target.value as Style })}
-                options={[
-                  { value: 'runner', label: 'Runner' },
-                  { value: 'leader', label: 'Leader' },
-                  { value: 'chaser', label: 'Chaser' },
-                  { value: 'closer', label: 'Closer' },
-                ]}
+                options={styleOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
               />
 
               <Select
