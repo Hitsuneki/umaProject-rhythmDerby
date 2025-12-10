@@ -75,6 +75,7 @@ export default function RacingPage() {
   const [lastFeedback, setLastFeedback] = useState<'good' | 'miss' | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [phaseQualities, setPhaseQualities] = useState<number[]>([]);
+  const [startTime, setStartTime] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchUmas = async () => {
@@ -198,7 +199,9 @@ export default function RacingPage() {
       setGoodRhythm(0);
       setOffBeatClicks(0);
       setPhaseQualities([]);
+      setPhaseQualities([]);
       setResult(null);
+      setStartTime(Date.now());
       
       return;
     }
@@ -406,12 +409,15 @@ export default function RacingPage() {
 
     try {
       // Post race results to API
+      const endTime = Date.now();
       await fetch('/api/races', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           umaId: currentUma.id,
           distanceType: selectedDistance,
+          startTime: startTime || (endTime - timeElapsed), // Fallback if startTime missing
+          endTime,
           startQuality: qualities[0],
           midQuality: qualities[1],
           finalQuality: qualities[2],
@@ -447,7 +453,7 @@ export default function RacingPage() {
     } catch (err) {
       setError('Failed to save race results');
     }
-  }, [currentUma, selectedDistance, runners, goodRhythm, offBeatClicks, timeElapsed]);
+  }, [currentUma, selectedDistance, runners, goodRhythm, offBeatClicks, timeElapsed, startTime]);
 
   const reset = () => {
     setSelectedDistance(null);
@@ -692,7 +698,7 @@ export default function RacingPage() {
                     </div>
                     <div className="flex items-center gap-2">
                        <span className="w-2 h-2 rounded-full bg-red-500" />
-                       <span className="text-red-600 font-bold">MISS: {offBeatClicks}</span>
+                       <span className="text-red-600 font-bold">SWITCH: {offBeatClicks}</span>
                     </div>
                   </div>
                 </div>
@@ -774,7 +780,7 @@ export default function RacingPage() {
                               : '0 0 20px rgba(239, 68, 68, 0.8)'
                           }}
                         >
-                          {lastFeedback === 'good' ? 'GOOD!' : 'MISS!'}
+                          {lastFeedback === 'good' ? 'GOOD!' : 'CHANGED!'}
                         </span>
                       </motion.div>
                     )}
@@ -926,7 +932,7 @@ export default function RacingPage() {
                                 </div>
                               ) : (
                                 /* Opponent Marker */
-                                <div className="w-10 h-10 rounded-full bg-(--charcoal) border-2 border-(--grey-light) flex items-center justify-center text-white text-xs font-bold shadow-md opacity-90">
+                                <div className="w-10 h-10 rounded-full bg-red-500 border-2 border-red-300 flex items-center justify-center text-white text-xs font-bold shadow-md opacity-90">
                                   {runner.name.slice(0, 1)}
                                 </div>
                               )}
