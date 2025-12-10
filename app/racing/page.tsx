@@ -72,6 +72,9 @@ export default function RacingPage() {
   
   const [result, setResult] = useState<{ placement: number; score: number; time: number } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [lastFeedback, setLastFeedback] = useState<'good' | 'miss' | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [phaseQualities, setPhaseQualities] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchUmas = async () => {
@@ -197,7 +200,6 @@ export default function RacingPage() {
       setPhaseQualities([]);
       setResult(null);
       
-      startRace(currentUma.id, selectedDistance);
       return;
     }
 
@@ -327,6 +329,7 @@ export default function RacingPage() {
 
     if (isOnBeat) {
       // On-beat: Build charge
+      setLastFeedback('good');
       setGoodRhythm((prev) => prev + 1);
       setCharge((prev) => {
         const newCharge = Math.min(MAX_CHARGE, prev + 1);
@@ -340,6 +343,7 @@ export default function RacingPage() {
       });
     } else {
       // Off-beat: Switch lane
+      setLastFeedback('miss');
       setOffBeatClicks((prev) => prev + 1);
       setRunners((prevRunners) =>
         prevRunners.map((runner) => {
@@ -351,6 +355,13 @@ export default function RacingPage() {
         })
       );
     }
+    
+    // Show feedback animation
+    setShowFeedback(true);
+    setTimeout(() => {
+      setShowFeedback(false);
+      setLastFeedback(null);
+    }, 500);
   };
 
   const triggerBurst = () => {
@@ -633,32 +644,141 @@ export default function RacingPage() {
               </div>
             </Card>
 
+            {/* Mini-Map / Progress Bar */}
+            <Card className="py-3 px-4">
+              <div className="flex items-center gap-4">
+                <div className="text-xs font-display font-bold uppercase text-(--grey-dark) w-16">
+                  Progress
+                </div>
+                <div className="relative flex-1 h-3 bg-(--grey-light) rounded-full overflow-visible">
+                  {/* Track Line */}
+                  <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-(--grey-medium) -translate-y-1/2 z-0" />
+                  
+                  {/* Runners Dots */}
+                  {runners.map((runner) => {
+                    const progress = (runner.position / raceConfig.distance) * 100;
+                    return (
+                      <motion.div
+                        key={`mini-${runner.id}`}
+                        className={`absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 z-10 ${
+                          runner.isPlayer 
+                            ? 'bg-(--accent) border-white w-4 h-4 shadow-[0_0_8px_rgba(6,182,212,0.8)]' 
+                            : 'bg-(--charcoal) border-white'
+                        }`}
+                        style={{ left: `${progress}%` }}
+                        animate={{ left: `${progress}%` }}
+                        transition={{ duration: 0.1, ease: "linear" }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="text-xs font-display font-bold uppercase text-(--grey-dark) w-16 text-right">
+                  {Math.round((playerRunner?.position || 0) / raceConfig.distance * 100)}%
+                </div>
+              </div>
+            </Card>
+
             {/* Beat Bar & Charge */}
             <Card>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-display uppercase tracking-wide text-(--grey-dark)">
-                    Beat Bar
+                  <p className="text-sm font-display font-bold uppercase tracking-wide text-(--charcoal)">
+                    BEAT BAR — CLICK ON GREEN TO CHARGE, OFF-BEAT SWITCHES LANE
                   </p>
-                  <div className="flex items-center gap-4 text-xs stat-mono">
-                    <span className="text-green-600">On-beat: {goodRhythm}</span>
-                    <span className="text-red-600">Off-beat: {offBeatClicks}</span>
+                  <div className="flex items-center gap-6 text-xs stat-mono">
+                    <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                       <span className="text-green-600 font-bold">GOOD: {goodRhythm}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <span className="w-2 h-2 rounded-full bg-red-500" />
+                       <span className="text-red-600 font-bold">MISS: {offBeatClicks}</span>
+                    </div>
                   </div>
                 </div>
 
                 {/* Beat Bar */}
-                <div className="relative h-10 bg-(--grey-light) rounded-lg overflow-hidden">
+                <div 
+                  className="relative h-16 rounded-lg overflow-hidden transition-all duration-200"
+                  style={{
+                    background: showFeedback 
+                      ? lastFeedback === 'good' 
+                        ? 'rgba(34, 197, 94, 0.2)' 
+                        : 'rgba(239, 68, 68, 0.2)'
+                      : 'var(--grey-light)',
+                    boxShadow: showFeedback
+                      ? lastFeedback === 'good'
+                        ? '0 0 20px rgba(34, 197, 94, 0.5)'
+                        : '0 0 20px rgba(239, 68, 68, 0.5)'
+                      : 'none'
+                  }}
+                >
+                  {/* Beat Tick Marks */}
+                  {[0, 25, 50, 75].map((pos) => (
+                    <div
+                      key={pos}
+                      className="absolute top-0 bottom-0 w-px bg-(--grey-medium) opacity-30"
+                      style={{ left: `${pos}%` }}
+                    />
+                  ))}
+
+                  {/* Sweet Zone */}
                   <motion.div
-                    className="absolute h-full bg-green-300/50 border-l-2 border-r-2 border-green-500"
+                    className="absolute h-full bg-green-400/70 border-l-4 border-r-4 border-green-600"
                     style={{
                       left: `${sweetZoneStartPercent}%`,
                       width: `${ON_BEAT_WINDOW * 100}%`,
                     }}
+                    animate={{
+                      left: `${sweetZoneStartPercent}%`,
+                      opacity: [0.7, 0.9, 0.7],
+                    }}
+                    transition={{ 
+                      left: { duration: 0.3 },
+                      opacity: { duration: 1, repeat: Infinity }
+                    }}
                   />
+                  
+                  {/* Beat Marker */}
                   <motion.div
-                    className="absolute top-0 bottom-0 w-1 bg-(--accent) shadow-lg"
-                    style={{ left: `${beatPositionPercent}%` }}
+                    className="absolute top-0 bottom-0 w-2 bg-cyan-400 shadow-lg z-10"
+                    style={{ 
+                      left: `${beatPositionPercent}%`,
+                      boxShadow: '0 0 10px rgba(34, 211, 238, 0.8), 0 0 20px rgba(34, 211, 238, 0.4)'
+                    }}
+                    animate={{ 
+                      left: `${beatPositionPercent}%`,
+                      scale: [1, 1.2, 1],
+                    }}
+                    transition={{ 
+                      left: { duration: 0 },
+                      scale: { duration: 0.3, repeat: Infinity }
+                    }}
                   />
+
+                  {/* Feedback Text */}
+                  <AnimatePresence>
+                    {showFeedback && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.5, y: -10 }}
+                        className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                      >
+                        <span 
+                          className="font-display text-4xl font-black tracking-wider"
+                          style={{
+                            color: lastFeedback === 'good' ? '#22c55e' : '#ef4444',
+                            textShadow: lastFeedback === 'good' 
+                              ? '0 0 20px rgba(34, 197, 94, 0.8)'
+                              : '0 0 20px rgba(239, 68, 68, 0.8)'
+                          }}
+                        >
+                          {lastFeedback === 'good' ? 'GOOD!' : 'MISS!'}
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Charge Dots */}
@@ -692,66 +812,128 @@ export default function RacingPage() {
               </div>
             </Card>
 
-            {/* Track */}
-            <Card>
-              <div className="space-y-3">
+             {/* Track */}
+            <Card className="overflow-hidden">
+              <div className="space-y-1">
                 {[...Array(NUM_LANES)].map((_, laneIndex) => {
                   const laneRunners = runners.filter(r => r.lane === laneIndex);
+                  /* Check if the player is currently in this lane to highlight it */
+                  const isPlayerLane = playerRunner?.lane === laneIndex;
                   
                   return (
-                    <div key={laneIndex} className="relative h-20 rounded-lg overflow-hidden">
-                      {/* Zone segments */}
-                      <div className="absolute inset-0 flex">
-                        {trackZones
-                          .filter(z => z.lane === laneIndex)
-                          .map((zone, zIndex) => {
-                            const widthPercent = ((zone.end - zone.start) / raceConfig.distance) * 100;
-                            const leftPercent = (zone.start / raceConfig.distance) * 100;
-                            
-                            let bgColor = 'bg-(--grey-light)';
-                            if (zone.type === 'boost') bgColor = 'bg-green-200';
-                            if (zone.type === 'drag') bgColor = 'bg-red-200';
-                            
-                            return (
-                              <div
-                                key={zIndex}
-                                className={`absolute h-full ${bgColor} border-r border-(--grey-medium)`}
-                                style={{
-                                  left: `${leftPercent}%`,
-                                  width: `${widthPercent}%`,
-                                }}
-                              />
-                            );
-                          })}
+                    <div 
+                      key={laneIndex} 
+                      className={`relative h-24 rounded-lg overflow-hidden transition-colors duration-300 ${
+                        isPlayerLane 
+                          ? 'bg-cyan-50/50 border-2 border-cyan-200 shadow-[inset_0_0_12px_rgba(6,182,212,0.1)]' 
+                          : 'bg-(--bg-surface) border border-(--grey-light)'
+                      }`}
+                    >
+                      {/* Lane Label */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-8 flex items-center justify-center border-r z-10 ${
+                        isPlayerLane ? 'bg-cyan-100/50 border-cyan-200 text-cyan-800' : 'bg-(--grey-light) border-(--border) text-(--grey-dark)'
+                      }`}>
+                        <span className="writing-mode-vertical rotate-180 font-display font-bold text-[10px] uppercase tracking-wider">
+                          Lane {laneIndex + 1}
+                        </span>
                       </div>
 
-                      {/* Lane label */}
-                      <div className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-display text-(--grey-dark) z-10">
-                        Lane {laneIndex + 1}
-                      </div>
+                      {/* Track Area (offset left due to label) */}
+                      <div className="absolute left-8 right-0 top-0 bottom-0">
+                         {/* Grid Lines */}
+                         <div className="absolute inset-0 flex pointer-events-none z-0">
+                           {[...Array(8)].map((_, i) => (
+                             <div key={i} className="flex-1 border-r border-(--border) opacity-30 last:border-r-0" />
+                           ))}
+                         </div>
 
-                      {/* Runners */}
-                      {laneRunners.map((runner) => {
-                        const positionPercent = (runner.position / raceConfig.distance) * 100;
-                        
-                        return (
-                          <motion.div
-                            key={runner.id}
-                            className={`absolute top-1/2 -translate-y-1/2 w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-xs z-20 ${
-                              runner.isPlayer
-                                ? runner.burstActive
-                                  ? 'bg-yellow-400 text-yellow-900 ring-4 ring-yellow-300'
-                                  : 'bg-(--accent) text-white'
-                                : 'bg-(--charcoal) text-white'
-                            }`}
-                            style={{ left: `${positionPercent}%` }}
-                            animate={{ left: `${positionPercent}%` }}
-                            transition={{ duration: 0 }}
-                          >
-                            {runner.isPlayer ? 'YOU' : runner.name.slice(-1)}
-                          </motion.div>
-                        );
-                      })}
+                         {/* Zone segments */}
+                         <div className="absolute inset-0">
+                           {trackZones
+                             .filter(z => z.lane === laneIndex)
+                             .map((zone, zIndex) => {
+                               const widthPercent = ((zone.end - zone.start) / raceConfig.distance) * 100;
+                               const leftPercent = (zone.start / raceConfig.distance) * 100;
+                               
+                               let bgStyle = { backgroundColor: 'transparent' };
+                               if (zone.type === 'boost') bgStyle = { backgroundColor: 'rgba(34, 197, 94, 0.1)' }; // Subtle Green
+                               if (zone.type === 'drag') bgStyle = { backgroundColor: 'rgba(239, 68, 68, 0.1)' }; // Subtle Red
+                               
+                               return (
+                                 <div
+                                   key={zIndex}
+                                   className="absolute h-full border-r border-dotted border-black/5"
+                                   style={{
+                                     left: `${leftPercent}%`,
+                                     width: `${widthPercent}%`,
+                                     ...bgStyle
+                                   }}
+                                 >
+                                    {/* Zone Icon/Indicator if needed */}
+                                    {zone.type === 'boost' && <div className="absolute bottom-1 right-1 text-[10px] font-bold text-green-600/50">{">>>"}</div>}
+                                    {zone.type === 'drag' && <div className="absolute bottom-1 right-1 text-[10px] font-bold text-red-600/50">!!!</div>}
+                                 </div>
+                               );
+                             })}
+                         </div>
+
+                        {/* Runners */}
+                        {laneRunners.map((runner) => {
+                          const positionPercent = (runner.position / raceConfig.distance) * 100;
+                          
+                          return (
+                            <motion.div
+                              key={runner.id}
+                              className={`absolute top-1/2 -translate-y-1/2 z-20 flex flex-col items-center`}
+                              style={{ left: `${positionPercent}%` }}
+                              animate={{ left: `${positionPercent}%` }}
+                              transition={{ duration: 0.2, ease: "linear" }}
+                              layoutId={`runner-${runner.id}`} // Enforce smooth layout transitions between lanes if possible
+                            >
+                              {runner.isPlayer ? (
+                                /* Player Marker */
+                                <div className="relative group">
+                                  {/* Runner Body */}
+                                  <motion.div 
+                                    className={`w-14 h-14 rounded-full flex items-center justify-center font-display font-black text-sm shadow-lg border-[3px] transition-all
+                                      ${runner.burstActive 
+                                        ? 'bg-yellow-400 text-yellow-900 border-yellow-200 shadow-[0_0_15px_rgba(250,204,21,0.6)]' 
+                                        : 'bg-white text-cyan-600 border-cyan-500 shadow-[0_4px_12px_rgba(6,182,212,0.4)]'
+                                      }
+                                    `}
+                                    animate={
+                                      runner.burstActive ? {
+                                        scale: [1, 1.1, 1],
+                                        rotate: [0, -2, 2, 0]
+                                      } : lastFeedback === 'good' && showFeedback ? {
+                                        scale: [1, 1.2, 1],
+                                        filter: 'brightness(1.2)',
+                                        borderColor: '#22c55e'
+                                      } : lastFeedback === 'miss' && showFeedback ? {
+                                        borderColor: '#ef4444',
+                                        x: [-2, 2, -2, 2, 0]
+                                      } : {}
+                                    }
+                                    transition={{ duration: 0.3 }}
+                                  >
+                                    YOU
+                                  </motion.div>
+                                  
+                                  {/* Trailing Highlight (Speed lines) */}
+                                   <div className="absolute top-1/2 right-full -mr-2 w-12 h-8 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none overflow-hidden">
+                                     <div className="w-full h-full bg-gradient-to-l from-cyan-400/30 to-transparent transform -skew-x-12" />
+                                   </div>
+                                </div>
+                              ) : (
+                                /* Opponent Marker */
+                                <div className="w-10 h-10 rounded-full bg-(--charcoal) border-2 border-(--grey-light) flex items-center justify-center text-white text-xs font-bold shadow-md opacity-90">
+                                  {runner.name.slice(0, 1)}
+                                </div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })}
