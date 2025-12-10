@@ -12,16 +12,19 @@ export async function GET() {
         id,
         uma_id AS umaId,
         distance_type AS distanceType,
+        start_time AS startTime,
+        end_time AS endTime,
         start_quality AS startQuality,
         mid_quality AS midQuality,
         final_quality AS finalQuality,
         overall_quality AS overallQuality,
         race_score AS score,
         placement,
-        created_at AS createdAt
+        race_score AS score,
+        placement
       FROM races
       WHERE user_id = ?
-      ORDER BY created_at DESC`,
+      ORDER BY start_time DESC`,
       [user.id],
     );
 
@@ -55,7 +58,7 @@ export async function GET() {
     const races = (raceRows as any[]).map((race) => ({
       ...race,
       id: String(race.id),
-      createdAt: race.createdAt ? new Date(race.createdAt).getTime() : Date.now(),
+      createdAt: race.startTime ? new Date(race.startTime).getTime() : Date.now(),
       participants: participantsMap[race.id] ?? [],
     }));
 
@@ -74,6 +77,8 @@ export async function POST(request: Request) {
   const {
     umaId,
     distanceType,
+    startTime,
+    endTime,
     startQuality = 0,
     midQuality = 0,
     finalQuality = 0,
@@ -92,14 +97,19 @@ export async function POST(request: Request) {
   try {
     await conn.beginTransaction();
 
+    const formattedStartTime = startTime ? new Date(startTime) : new Date();
+    const formattedEndTime = endTime ? new Date(endTime) : new Date();
+
     const [raceResult]: any = await conn.execute(
       `INSERT INTO races
-        (user_id, uma_id, distance_type, start_quality, mid_quality, final_quality, overall_quality, race_score, placement, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        (user_id, uma_id, distance_type, start_time, end_time, start_quality, mid_quality, final_quality, overall_quality, race_score, placement)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
         umaId,
         distanceType,
+        formattedStartTime,
+        formattedEndTime,
         startQuality,
         midQuality,
         finalQuality,
@@ -114,7 +124,7 @@ export async function POST(request: Request) {
     if (Array.isArray(participants) && participants.length > 0) {
       const values: any[] = [];
       const placeholders = participants
-        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?)')
         .join(',');
 
       participants.forEach((p: any) => {
@@ -126,14 +136,13 @@ export async function POST(request: Request) {
           Number(p.stamina ?? 0),
           Number(p.technique ?? 0),
           p.lanePath ?? '',
-          Number(p.finalPos ?? 0),
-          user.id,
+          Number(p.finalPos ?? 0)
         );
       });
 
       await conn.execute(
         `INSERT INTO race_participants
-          (race_id, is_player, name, speed, stamina, technique, lane_path, final_pos, user_id)
+          (race_id, is_player, name, speed, stamina, technique, lane_path, final_pos)
          VALUES ${placeholders}`,
         values,
       );
