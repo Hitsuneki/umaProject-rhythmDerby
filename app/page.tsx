@@ -338,12 +338,12 @@ export default function Dashboard() {
                       <Button variant="primary" className="w-full py-4" icon={<CheckCircle />}>
                         Set as Active
                       </Button>
-                      <Link href="/training" className="block">
+                      <Link href={`/training?id=${selectedUma.id}`} className="block">
                         <Button variant="secondary" className="w-full py-4" icon={<Zap />}>
                           Start Training
                         </Button>
                       </Link>
-                      <Link href="/racing" className="block">
+                      <Link href={`/racing?id=${selectedUma.id}`} className="block">
                         <Button variant="secondary" className="w-full py-4" icon={<Trophy />}>
                           Enter Race
                         </Button>

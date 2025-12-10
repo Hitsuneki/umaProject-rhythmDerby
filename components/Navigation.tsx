@@ -62,7 +62,7 @@ export function Navigation() {
               <Trophy className="w-6 h-6 text-white" style={{ width: '24px', height: '24px', color: 'white' }} />
             </div>
             <span className="font-display text-xl font-bold uppercase tracking-wider" style={{ color: 'var(--charcoal)' }}>
-              Uma Racing
+              Uma Project
             </span>
           </Link>
 

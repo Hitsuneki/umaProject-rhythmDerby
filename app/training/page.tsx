@@ -22,6 +22,7 @@ export default function TrainingPage() {
   const umaId = searchParams.get('id');
 
   const [currentUma, setCurrentUma] = useState<Uma | null>(null);
+  const [availableUmas, setAvailableUmas] = useState<Uma[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -37,32 +38,39 @@ export default function TrainingPage() {
   const [charge, setCharge] = useState(0);
   const [burstActive, setBurstActive] = useState(false);
   const [result, setResult] = useState<{ quality: number; gains: any; label: string } | null>(null);
+  const [lastFeedback, setLastFeedback] = useState<'good' | 'miss' | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
   useEffect(() => {
-    const loadUma = async () => {
-      if (!umaId) {
-        setError('No Uma selected');
-        setLoading(false);
-        return;
-      }
-
+    const fetchUmas = async () => {
       try {
-        const res = await fetch(`/api/uma/${umaId}`);
-        if (!res.ok) throw new Error('Failed to fetch Uma');
+        const res = await fetch('/api/uma');
+        if (!res.ok) throw new Error('Failed to fetch Umas');
         const data = await res.json();
-        setCurrentUma(data);
+        setAvailableUmas(data);
+
+        // If ID is in URL, select that Uma
+        if (umaId) {
+          const selected = data.find((u: Uma) => u.id === umaId);
+          if (selected) {
+            setCurrentUma(selected);
+          } else {
+            setError('Selected Uma not found');
+          }
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load Uma');
+        setError(err instanceof Error ? err.message : 'Failed to load characters');
       } finally {
         setLoading(false);
       }
     };
 
-    loadUma();
+    fetchUmas();
   }, [umaId]);
   useEffect(() => {
     if (!isTraining) return;
@@ -91,16 +99,34 @@ export default function TrainingPage() {
     if (!currentUma) return;
     
     setSelectedSession(sessionType);
-    setIsTraining(true);
-    setTimeLeft(SESSION_DURATION);
-    setBeatPosition(0);
-    setSweetZoneStart(0.4);
-    setGoodRhythm(0);
-    setMissRhythm(0);
-    setCharge(0);
-    setBurstActive(false);
-    setResult(null);
+    setCountdown(3);
   };
+
+  // Countdown effect
+  useEffect(() => {
+    if (countdown === null) return;
+
+    if (countdown === 0) {
+      // Start the actual training
+      setCountdown(null);
+      setIsTraining(true);
+      setTimeLeft(SESSION_DURATION);
+      setBeatPosition(0);
+      setSweetZoneStart(0.4);
+      setGoodRhythm(0);
+      setMissRhythm(0);
+      setCharge(0);
+      setBurstActive(false);
+      setResult(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(countdown - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const handleClick = () => {
     if (!isTraining || burstActive) return;
@@ -113,6 +139,7 @@ export default function TrainingPage() {
 
     if (isOnBeat) {
       // On-beat: Good rhythm
+      setLastFeedback('good');
       setGoodRhythm((prev) => prev + 1);
       setCharge((prev) => {
         const newCharge = Math.min(MAX_CHARGE, prev + 1);
@@ -127,10 +154,18 @@ export default function TrainingPage() {
       });
     } else {
       // Off-beat: Miss
+      setLastFeedback('miss');
       setMissRhythm((prev) => prev + 1);
       // Small penalty: lose some charge
       setCharge((prev) => Math.max(0, prev - 0.5));
     }
+
+    // Show feedback animation
+    setShowFeedback(true);
+    setTimeout(() => {
+      setShowFeedback(false);
+      setLastFeedback(null);
+    }, 500);
   };
 
   const triggerBurst = () => {
@@ -153,43 +188,40 @@ export default function TrainingPage() {
     const totalClicks = goodRhythm + missRhythm;
     let quality = totalClicks > 0 ? Math.round((goodRhythm / totalClicks) * 100) : 0;
 
-    // Quality label
-    let label = 'Rough Session';
-    if (quality >= 80) label = 'Excellent!';
-    else if (quality >= 60) label = 'Good Session';
-    else if (quality >= 40) label = 'Fair Session';
-
     // Calculate stat gains based on session type and quality
+    // Ensure meaningful gains even for moderate performance
     let gains = { speed: 0, stamina: 0, technique: 0 };
-    const baseGain = Math.floor(quality / 10);
+    
+    // Base gain: minimum 1 point for any successful clicks, scaling with quality
+    const baseGain = Math.max(1, Math.floor(quality / 10));
 
     // Energy penalty multiplier
     const energyMultiplier = currentUma.energy < 30 ? 0.5 : 1.0;
 
     switch (selectedSession) {
       case 'speed':
-        gains.speed = Math.floor(baseGain * energyMultiplier);
+        gains.speed = Math.max(1, Math.floor(baseGain * energyMultiplier));
         if (quality >= 80) gains.technique += 1; // Bonus for excellent form
         break;
 
       case 'stamina':
-        gains.stamina = Math.floor(baseGain * energyMultiplier);
-        if (quality < 40) gains.speed = Math.max(-1, -1); // Penalty for poor form
+        gains.stamina = Math.max(1, Math.floor(baseGain * energyMultiplier));
+        if (quality < 40 && quality > 0) gains.speed = -1; // Small penalty for poor form
         break;
 
       case 'technique':
-        gains.technique = Math.floor(baseGain * energyMultiplier);
+        gains.technique = Math.max(1, Math.floor(baseGain * energyMultiplier));
         break;
 
       case 'mixed':
-        const mixedGain = Math.floor((baseGain / 2) * energyMultiplier);
+        const mixedGain = Math.max(1, Math.floor((baseGain / 2) * energyMultiplier));
         gains = { speed: mixedGain, stamina: mixedGain, technique: mixedGain };
         break;
     }
 
     try {
       // Post training results to API
-      await fetch('/api/training', {
+      const response = await fetch('/api/training', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -204,16 +236,33 @@ export default function TrainingPage() {
         }),
       });
 
-      // Update local state with new stats
+      if (!response.ok) {
+        throw new Error('Failed to save training');
+      }
+
+      const data = await response.json();
+
+      // Quality label based on actual quality
+      let label = 'Rough Session';
+      if (data.quality >= 80) label = 'Excellent!';
+      else if (data.quality >= 60) label = 'Good Session';
+      else if (data.quality >= 40) label = 'Fair Session';
+
+      // Update local state with new stats from API
       setCurrentUma({
         ...currentUma,
-        speed: Math.max(0, Math.min(100, currentUma.speed + gains.speed)),
-        stamina: Math.max(0, Math.min(100, currentUma.stamina + gains.stamina)),
-        technique: Math.max(0, Math.min(100, currentUma.technique + gains.technique)),
-        energy: Math.max(0, currentUma.energy - 15),
+        speed: data.uma.speed,
+        stamina: data.uma.stamina,
+        technique: data.uma.technique,
+        energy: data.uma.energy,
       });
 
-      setResult({ quality, gains, label });
+      // Use API response data for results
+      setResult({ 
+        quality: data.quality, 
+        gains: data.gains, 
+        label 
+      });
     } catch (err) {
       setError('Failed to save training results');
     }
@@ -240,17 +289,100 @@ export default function TrainingPage() {
 
   if (!currentUma) {
     return (
-      <Card className="text-center py-16">
-        <h2 className="font-display text-2xl font-bold mb-4 text-(--charcoal)">
-          No Uma Selected
-        </h2>
-        <p className="text-(--grey-dark) mb-6">
-          Please select an Uma from your stable first
-        </p>
-        <Button variant="primary" onClick={() => router.push('/characters')}>
-          Go to Characters
-        </Button>
-      </Card>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-(--charcoal) mb-2">
+              Select Uma for Training
+            </h1>
+            <p className="text-(--grey-dark)">
+              Choose a character to start a rhythm training session
+            </p>
+          </div>
+          <Button variant="secondary" icon={<ArrowLeft />} onClick={() => router.push('/')}>
+            Back to Dashboard
+          </Button>
+        </div>
+
+        {availableUmas.length === 0 ? (
+          <Card className="text-center py-16">
+            <h2 className="font-display text-xl font-semibold mb-2 text-(--charcoal)">
+              No Characters Found
+            </h2>
+            <p className="text-(--grey-dark) mb-6">
+              You need to recruit an Uma Musume before you can train.
+            </p>
+            <Button variant="primary" onClick={() => router.push('/characters/new')} icon={<Zap />}>
+              Recruit New Uma
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {availableUmas.map((uma, index) => (
+              <motion.div
+                key={uma.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <Card hover className="h-full">
+                  <div className="space-y-4">
+                    {/* Header */}
+                    <div className="flex items-start gap-4">
+                      <div className="relative">
+                        <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-(--accent) to-(--accent-dark) flex items-center justify-center ring-2 ring-(--accent)/20">
+                          <User className="w-10 h-10 text-white" />
+                        </div>
+                        <div className="absolute -bottom-2 -right-2 bg-(--accent) text-white rounded-full w-7 h-7 flex items-center justify-center font-display text-xs font-bold">
+                          {uma.level}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-display text-lg font-bold text-(--charcoal) truncate mb-1">
+                          {uma.name}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge variant="accent">{uma.style}</Badge>
+                          <Badge>{uma.temperament}</Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stats */}
+                    <div className="space-y-2">
+                      <StatBar label="SPD" value={uma.speed} maxValue={100} showValue={false} color="#FF4F00" />
+                      <StatBar label="STA" value={uma.stamina} maxValue={100} showValue={false} color="#00A4F0" />
+                      <StatBar label="TEC" value={uma.technique} maxValue={100} showValue={false} color="#8FED1D" />
+                    </div>
+
+                    {/* Trait */}
+                    <div className="p-3 bg-(--grey-light) rounded-lg">
+                      <p className="text-xs font-display uppercase tracking-wide text-(--grey-dark)">
+                        {uma.trait ? (uma.trait as string).replace(/_/g, ' ') : 'No Trait'}
+                      </p>
+                    </div>
+
+                    {/* Train Action */}
+                    <Button
+                      variant="primary"
+                      className="w-full py-3"
+                      onClick={() => {
+                        setCurrentUma(uma);
+                        // Optional: update URL shallowly so reload keeps selection, or strict push
+                        const newUrl = `/training?id=${uma.id}`;
+                        window.history.pushState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+                      }}
+                      icon={<Zap className="w-4 h-4" />}
+                    >
+                      TRAIN NOW
+                    </Button>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -362,6 +494,32 @@ export default function TrainingPage() {
           </motion.div>
         )}
 
+        {countdown !== null && (
+          <motion.div
+            key="countdown"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+          >
+            <Card className="text-center py-20">
+              <motion.div
+                key={countdown}
+                initial={{ scale: 1.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.5, opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <p className="text-sm font-display uppercase tracking-wide text-(--grey-dark) mb-4">
+                  Get Ready!
+                </p>
+                <p className="font-display text-9xl font-black text-(--accent)">
+                  {countdown}
+                </p>
+              </motion.div>
+            </Card>
+          </motion.div>
+        )}
+
         {isTraining && (
           <motion.div
             key="training"
@@ -396,42 +554,95 @@ export default function TrainingPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-display uppercase tracking-wide text-(--grey-dark)">
-                      Rhythm Bar
+                      Rhythm Bar - Click when marker enters GREEN zone
                     </p>
                     <div className="flex items-center gap-4 text-xs stat-mono">
-                      <span className="text-green-600">Good: {goodRhythm}</span>
-                      <span className="text-red-600">Miss: {missRhythm}</span>
+                      <span className="text-green-600 font-bold">✓ Good: {goodRhythm}</span>
+                      <span className="text-red-600 font-bold">✗ Miss: {missRhythm}</span>
                     </div>
                   </div>
                   
-                  <div className="relative h-12 bg-(--grey-light) rounded-lg overflow-hidden">
+                  <div 
+                    className="relative h-16 rounded-lg overflow-hidden transition-all duration-200"
+                    style={{
+                      background: showFeedback 
+                        ? lastFeedback === 'good' 
+                          ? 'rgba(34, 197, 94, 0.2)' 
+                          : 'rgba(239, 68, 68, 0.2)'
+                        : 'var(--grey-light)',
+                      boxShadow: showFeedback
+                        ? lastFeedback === 'good'
+                          ? '0 0 20px rgba(34, 197, 94, 0.5)'
+                          : '0 0 20px rgba(239, 68, 68, 0.5)'
+                        : 'none'
+                    }}
+                  >
+                    {/* Beat Tick Marks */}
+                    {[0, 25, 50, 75].map((pos) => (
+                      <div
+                        key={pos}
+                        className="absolute top-0 bottom-0 w-px bg-(--grey-medium) opacity-30"
+                        style={{ left: `${pos}%` }}
+                      />
+                    ))}
+
                     {/* Sweet Zone */}
                     <motion.div
-                      className="absolute h-full bg-green-300/50 border-l-2 border-r-2 border-green-500"
+                      className="absolute h-full bg-green-400/70 border-l-4 border-r-4 border-green-600"
                       style={{
                         left: `${sweetZoneStartPercent}%`,
                         width: `${ON_BEAT_WINDOW * 100}%`,
                       }}
                       animate={{
                         left: `${sweetZoneStartPercent}%`,
+                        opacity: [0.7, 0.9, 0.7],
                       }}
-                      transition={{ duration: 0.3 }}
+                      transition={{ 
+                        left: { duration: 0.3 },
+                        opacity: { duration: 1, repeat: Infinity }
+                      }}
                     />
                     
                     {/* Beat Marker */}
                     <motion.div
-                      className="absolute top-0 bottom-0 w-1 bg-(--accent) shadow-lg"
-                      style={{ left: `${beatPositionPercent}%` }}
-                      animate={{ left: `${beatPositionPercent}%` }}
-                      transition={{ duration: 0 }}
+                      className="absolute top-0 bottom-0 w-2 bg-cyan-400 shadow-lg z-10"
+                      style={{ 
+                        left: `${beatPositionPercent}%`,
+                        boxShadow: '0 0 10px rgba(34, 211, 238, 0.8), 0 0 20px rgba(34, 211, 238, 0.4)'
+                      }}
+                      animate={{ 
+                        left: `${beatPositionPercent}%`,
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{ 
+                        left: { duration: 0 },
+                        scale: { duration: 0.3, repeat: Infinity }
+                      }}
                     />
                     
-                    {/* Labels */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <span className="text-xs font-display text-(--grey-dark)">
-                        Click when marker is in green zone
-                      </span>
-                    </div>
+                    {/* Feedback Text */}
+                    <AnimatePresence>
+                      {showFeedback && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.5, y: -10 }}
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                        >
+                          <span 
+                            className="font-display text-4xl font-black tracking-wider"
+                            style={{
+                              color: lastFeedback === 'good' ? '#22c55e' : '#ef4444',
+                              textShadow: lastFeedback === 'good' 
+                                ? '0 0 20px rgba(34, 197, 94, 0.8)'
+                                : '0 0 20px rgba(239, 68, 68, 0.8)'
+                            }}
+                          >
+                            {lastFeedback === 'good' ? 'GOOD!' : 'MISS!'}
+                          </span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 

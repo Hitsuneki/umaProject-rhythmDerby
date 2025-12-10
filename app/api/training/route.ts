@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getConnection, query } from '@/lib/db';
-
-const DEMO_USER_ID = 1;
+import { getCurrentUser } from '@/lib/auth';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export async function GET() {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   try {
     const [rows] = await query(
       `SELECT 
@@ -22,7 +24,7 @@ export async function GET() {
       FROM training_sessions
       WHERE user_id = ?
       ORDER BY created_at DESC`,
-      [DEMO_USER_ID],
+      [user.id],
     );
 
     return NextResponse.json(rows);
@@ -33,6 +35,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
   const body = await request.json();
   const {
     umaId,
@@ -56,7 +61,7 @@ export async function POST(request: Request) {
 
     const [umaRows]: any = await conn.execute(
       `SELECT id, speed, stamina, technique, energy, max_energy AS maxEnergy FROM uma_characters WHERE id = ? AND user_id = ? FOR UPDATE`,
-      [umaId, DEMO_USER_ID],
+      [umaId, user.id],
     );
 
     const uma = umaRows[0];
@@ -75,7 +80,7 @@ export async function POST(request: Request) {
         (user_id, uma_id, session_type, quality_pct, speed_delta, stamina_delta, technique_delta, energy_before, energy_after, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
-        DEMO_USER_ID,
+        user.id,
         umaId,
         sessionType,
         qualityPct,
@@ -89,9 +94,9 @@ export async function POST(request: Request) {
 
     await conn.execute(
       `UPDATE uma_characters
-       SET speed = ?, stamina = ?, technique = ?, energy = ?, last_energy_update = NOW()
+       SET speed = ?, stamina = ?, technique = ?, energy = ?, last_energy_at = NOW()
        WHERE id = ? AND user_id = ?`,
-      [newSpeed, newStamina, newTechnique, newEnergy, umaId, DEMO_USER_ID],
+      [newSpeed, newStamina, newTechnique, newEnergy, umaId, user.id],
     );
 
     await conn.commit();
@@ -99,8 +104,14 @@ export async function POST(request: Request) {
     return NextResponse.json({
       message: 'Training saved',
       id: insertResult.insertId,
+      quality: qualityPct,
+      gains: {
+        speed: speedDelta,
+        stamina: staminaDelta,
+        technique: techniqueDelta,
+      },
       uma: {
-        ...uma,
+        id: uma.id,
         speed: newSpeed,
         stamina: newStamina,
         technique: newTechnique,
@@ -115,4 +126,3 @@ export async function POST(request: Request) {
     conn.release();
   }
 }
-
