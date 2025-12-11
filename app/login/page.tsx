@@ -10,8 +10,9 @@ import { useResponsive } from '@/hooks/useResponsive';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuthStore();
+  const { login, user } = useAuthStore();
   const { isMobile } = useResponsive();
+  /* Form State */
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -21,21 +22,72 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
+  /* Validation State */
+  const [fieldErrors, setFieldErrors] = useState({
+    email: '',
+    password: ''
+  });
+
+  const validateForm = () => {
+    const errors = { email: '', password: '' };
+    let isValid = true;
+
+    // Email Validation
+    if (!formData.email) {
+      errors.email = 'EMAIL IS REQUIRED';
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'INVALID EMAIL FORMAT';
+      isValid = false;
+    }
+
+    // Password Validation
+    if (!formData.password) {
+      errors.password = 'PASSWORD IS REQUIRED';
+      isValid = false;
+    } else if (formData.password.length < 8) {
+      errors.password = 'PASSWORD TOO SHORT (MIN 8 CHARS)';
+      isValid = false;
+    }
+
+    setFieldErrors(errors);
+    return isValid;
+  };
+
   const handleSubmit = async (email: string, password: string) => {
+    if (!validateForm()) return;
+
     setIsLoading(true);
     setError('');
 
     try {
       const success = await login(email, password);
+      // Wait a brief moment to show "VERIFIED" state if successful
       if (success) {
-        router.push('/');
+        setTimeout(() => router.push('/'), 800);
       } else {
+        // Handle generic failure if not caught by specific error mapping
         setError('AUTHENTICATION FAILED - INVALID CREDENTIALS');
+        // Map generic failure to fields if possible guess
+        setFieldErrors(prev => ({
+          ...prev,
+          password: 'ACCESS CODE IS INCORRECT', // Common fallback
+        }));
       }
-    } catch (err) {
-      setError('SYSTEM ERROR - CONNECTION TIMEOUT');
+    } catch (err: any) {
+      console.error(err);
+      // Try to map server errors if they follow a known structure, otherwise generic
+      if (err?.message === 'USER_NOT_FOUND') {
+        setFieldErrors(prev => ({ ...prev, email: 'NO OPERATOR ACCOUNT FOUND' }));
+      } else if (err?.message === 'INVALID_PASSWORD') {
+        setFieldErrors(prev => ({ ...prev, password: 'ACCESS CODE IS INCORRECT' }));
+      } else {
+        setError('SYSTEM ERROR - CONNECTION TIMEOUT');
+      }
     } finally {
-      setIsLoading(false);
+      if (!user) { // Only stop loading if not successful (to show Verified state)
+        setIsLoading(false);
+      }
     }
   };
 
@@ -46,13 +98,17 @@ export default function LoginPage() {
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear specific field error on change
+    if (field === 'email' || field === 'password') {
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
     if (error) setError('');
   };
 
   // Show mobile version on small screens
   if (isMobile) {
     return (
-      <MobileLogin 
+      <MobileLogin
         onSubmit={handleSubmit}
         isLoading={isLoading}
         error={error}
@@ -65,15 +121,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gray-50 relative overflow-hidden">
       {/* Animated Background Grid */}
       <div className="absolute inset-0 opacity-20">
-        <motion.div 
+        <motion.div
           className="absolute inset-0 grid-pattern"
-          animate={{ 
+          animate={{
             backgroundPosition: ['0px 0px', '32px 32px'],
           }}
-          transition={{ 
-            duration: 20, 
-            repeat: Infinity, 
-            ease: 'linear' 
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: 'linear'
           }}
         />
       </div>
@@ -83,10 +139,10 @@ export default function LoginPage() {
         className="absolute inset-0 pointer-events-none"
         initial={{ y: '-100vh' }}
         animate={{ y: '100vh' }}
-        transition={{ 
-          duration: 8, 
-          repeat: Infinity, 
-          ease: 'linear' 
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          ease: 'linear'
         }}
       >
         <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
@@ -96,26 +152,26 @@ export default function LoginPage() {
       <div className="absolute top-0 left-0 w-full h-1 overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"
-          animate={{ 
+          animate={{
             x: ['-100%', '200%'],
           }}
-          transition={{ 
-            duration: 6, 
-            repeat: Infinity, 
-            ease: 'easeInOut' 
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: 'easeInOut'
           }}
         />
       </div>
-      
+
       <div className="absolute bottom-0 right-0 w-full h-1 overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-l from-transparent via-orange-500/40 to-transparent"
-          animate={{ 
+          animate={{
             x: ['100%', '-200%'],
           }}
-          transition={{ 
-            duration: 8, 
-            repeat: Infinity, 
+          transition={{
+            duration: 8,
+            repeat: Infinity,
             ease: 'easeInOut',
             delay: 2
           }}
@@ -124,7 +180,7 @@ export default function LoginPage() {
 
       <div className="relative z-10 min-h-screen flex">
         {/* Left Panel - System Status */}
-        <motion.div 
+        <motion.div
           className="hidden lg:flex lg:w-1/2 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex-col justify-center p-12 relative"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -134,20 +190,20 @@ export default function LoginPage() {
           <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
             <motion.div
               className="w-full bg-gradient-to-b from-transparent via-cyan-500/30 to-transparent h-32"
-              animate={{ 
+              animate={{
                 y: ['-100%', '400%'],
               }}
-              transition={{ 
-                duration: 4, 
-                repeat: Infinity, 
-                ease: 'linear' 
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'linear'
               }}
             />
           </div>
 
           <div className="space-y-8">
             {/* System Header */}
-            <motion.div 
+            <motion.div
               className="space-y-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -166,12 +222,12 @@ export default function LoginPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="h-px bg-gradient-to-r from-cyan-500/50 via-cyan-500/20 to-transparent" />
             </motion.div>
 
             {/* System Status Grid */}
-            <motion.div 
+            <motion.div
               className="space-y-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -185,7 +241,7 @@ export default function LoginPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <motion.div 
+                        <motion.div
                           className="w-2 h-2 bg-green-500 rounded-full"
                           animate={{ opacity: [1, 0.5, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
@@ -261,7 +317,7 @@ export default function LoginPage() {
             </motion.div>
 
             {/* Neural Activity Visualization */}
-            <motion.div 
+            <motion.div
               className="relative"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -273,11 +329,11 @@ export default function LoginPage() {
                     <motion.div
                       key={i}
                       className="w-1 bg-cyan-500/40 min-h-1"
-                      animate={{ 
+                      animate={{
                         height: [4, Math.random() * 60 + 8, 4],
                         opacity: [0.4, 0.8, 0.4]
                       }}
-                      transition={{ 
+                      transition={{
                         duration: 1.5 + Math.random() * 2,
                         repeat: Infinity,
                         delay: Math.random() * 2,
@@ -311,18 +367,18 @@ export default function LoginPage() {
             className="w-full max-w-md relative"
           >
             {/* Login Card */}
-            <div className="bg-white border border-gray-200 shadow-lg overflow-hidden relative">
+            <div className={`bg-white border shadow-lg overflow-hidden relative transition-colors duration-300 ${error ? 'border-red-300' : 'border-gray-200'}`}>
               {/* Ambient Side Accent */}
               <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
                 <motion.div
-                  className="w-full bg-gradient-to-b from-cyan-500/30 via-transparent to-orange-500/30 h-full"
-                  animate={{ 
+                  className={`w-full h-full bg-gradient-to-b ${error ? 'from-red-500/30 via-orange-500/30 to-transparent' : 'from-cyan-500/30 via-transparent to-orange-500/30'}`}
+                  animate={{
                     backgroundPosition: ['0% 0%', '0% 100%'],
                   }}
-                  transition={{ 
-                    duration: 3, 
-                    repeat: Infinity, 
-                    ease: 'easeInOut' 
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
                   }}
                 />
               </div>
@@ -336,12 +392,14 @@ export default function LoginPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <motion.div 
-                      className="w-2 h-2 bg-green-500 rounded-full"
+                    <motion.div
+                      className={`w-2 h-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500'}`}
                       animate={{ opacity: [1, 0.3, 1] }}
                       transition={{ duration: 2, repeat: Infinity }}
                     />
-                    <span className="text-xs font-mono text-gray-600 font-bold uppercase">SECURE</span>
+                    <span className={`text-xs font-mono font-bold uppercase ${error ? 'text-red-600' : 'text-gray-600'}`}>
+                      {error ? 'AUTH_FAIL' : 'SECURE'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -349,7 +407,7 @@ export default function LoginPage() {
               {/* Card Content */}
               <div className="p-6 space-y-6 relative">
                 {/* Title Section */}
-                <motion.div 
+                <motion.div
                   className="text-center space-y-3"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -392,16 +450,16 @@ export default function LoginPage() {
                 </AnimatePresence>
 
                 {/* Login Form */}
-                <motion.form 
-                  onSubmit={handleDesktopSubmit} 
+                <motion.form
+                  onSubmit={handleDesktopSubmit}
                   className="space-y-5"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.6 }}
                 >
                   {/* Email Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.email ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       OPERATOR EMAIL
                     </label>
                     <div className="relative">
@@ -411,11 +469,13 @@ export default function LoginPage() {
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         onFocus={() => setFocusedField('email')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.email
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="trainer@rhythmderby.com"
-                        required
                       />
-                      {focusedField === 'email' && (
+                      {focusedField === 'email' && !fieldErrors.email && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -423,15 +483,30 @@ export default function LoginPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center">
-                        <div className="w-1 h-4 bg-gray-300" />
+
+                      {/* Technical marker */}
+                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center pointer-events-none">
+                        <div className={`w-1 h-4 transition-colors ${fieldErrors.email ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.email && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.email}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Password Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.password ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       ACCESS CODE
                     </label>
                     <div className="relative">
@@ -441,9 +516,11 @@ export default function LoginPage() {
                         onChange={(e) => handleInputChange('password', e.target.value)}
                         onFocus={() => setFocusedField('password')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 pr-12 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.password
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="••••••••••••••••"
-                        required
                       />
                       <button
                         type="button"
@@ -452,7 +529,7 @@ export default function LoginPage() {
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                      {focusedField === 'password' && (
+                      {focusedField === 'password' && !fieldErrors.password && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -460,17 +537,33 @@ export default function LoginPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-12 w-1 h-full flex items-center">
-                        <div className="w-full h-4 bg-gray-300" />
+                      <div className="absolute top-0 right-12 w-1 h-full flex items-center pointer-events-none">
+                        <div className={`w-full h-4 transition-colors ${fieldErrors.password ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.password && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.password}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Submit Button */}
                   <motion.button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-mono font-bold py-4 px-6 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 text-sm uppercase tracking-wide relative overflow-hidden group"
+                    className={`w-full font-mono font-bold py-4 px-6 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 text-sm uppercase tracking-wide relative overflow-hidden group ${user // Success state (kind of a hack since we redirect, but good for transition)
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                      }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -480,7 +573,7 @@ export default function LoginPage() {
                       animate={{ x: ['-100%', '200%'] }}
                       transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                     />
-                    
+
                     {/* Button content */}
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-3">
@@ -489,7 +582,7 @@ export default function LoginPage() {
                           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                           className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                         />
-                        <span>AUTHENTICATING...</span>
+                        <span>{user ? 'VERIFIED - REDIRECTING...' : 'VERIFYING CREDENTIALS...'}</span>
                         <div className="flex gap-1">
                           {[0, 1, 2].map((i) => (
                             <motion.div
@@ -511,21 +604,21 @@ export default function LoginPage() {
                 </motion.form>
 
                 {/* Secondary Actions */}
-                <motion.div 
+                <motion.div
                   className="space-y-4 pt-4 border-t border-gray-200"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 }}
                 >
                   <div className="flex flex-col sm:flex-row gap-3 text-center">
-                    <Link 
-                      href="/register" 
+                    <Link
+                      href="/register"
                       className="flex-1 text-xs text-gray-600 hover:text-cyan-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-cyan-600 bg-gray-50 hover:bg-cyan-50"
                     >
                       [REG] CREATE NEW OPERATOR
                     </Link>
-                    <Link 
-                      href="/forgot-password" 
+                    <Link
+                      href="/forgot-password"
                       className="flex-1 text-xs text-gray-600 hover:text-orange-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-orange-600 bg-gray-50 hover:bg-orange-50"
                     >
                       [RESET] RECOVER ACCESS
@@ -542,7 +635,7 @@ export default function LoginPage() {
                     <span className="uppercase">NODE: CN-01</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <motion.div 
+                    <motion.div
                       className="w-1 h-1 bg-green-500 rounded-full"
                       animate={{ opacity: [1, 0.3, 1] }}
                       transition={{ duration: 2, repeat: Infinity }}
@@ -554,7 +647,7 @@ export default function LoginPage() {
             </div>
 
             {/* Security Footer */}
-            <motion.div 
+            <motion.div
               className="mt-6 text-center space-y-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -565,7 +658,7 @@ export default function LoginPage() {
               </p>
               <div className="flex items-center justify-center gap-4 text-xs font-mono text-gray-500">
                 <div className="flex items-center gap-2">
-                  <motion.div 
+                  <motion.div
                     className="w-1 h-1 bg-green-500 rounded-full"
                     animate={{ opacity: [1, 0.3, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}

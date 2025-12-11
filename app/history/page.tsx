@@ -210,7 +210,12 @@ export default function HistoryPage() {
                           </div>
                         </td>
                         <td className="py-3 px-4 text-sm font-semibold text-(--charcoal)">
-                          {uma?.name || 'Unknown'}
+                          <div>
+                            <div>{race.umaName || 'Unknown'}</div>
+                            {race.umaStyle && (
+                              <div className="text-xs text-(--grey-dark)">{race.umaStyle}</div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-3 px-4">
                           <Badge>{race.distanceType}</Badge>
