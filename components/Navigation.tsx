@@ -10,9 +10,8 @@ import { useAuthStore } from '@/stores/authStore';
 // Navigation routes configuration
 const navRoutes = [
   { href: '/', label: 'DASHBOARD' },
-  { href: '/training', label: 'TRAINING' },
-  { href: '/racing', label: 'RACING' },
   { href: '/characters', label: 'STABLE' },
+  { href: '/racing', label: 'RACING' },
   { href: '/gacha', label: 'MARKET' },
   { href: '/history', label: 'STATS' },
 ];
@@ -28,12 +27,12 @@ export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, logout, fetchUser } = useAuthStore();
-  
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [energy, setEnergy] = useState(73); // Mock energy - would come from API
   const [maxEnergy] = useState(100);
-  
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch user data on mount and periodically
@@ -105,9 +104,9 @@ export function Navigation() {
   return (
     <>
       {/* Desktop & Tablet Navbar */}
-      <nav 
+      <nav
         className="fixed top-0 left-0 right-0 z-[100] border-b"
-        style={{ 
+        style={{
           height: 'var(--navbar-height)',
           backgroundColor: 'var(--color-navbar-bg)',
           borderColor: 'var(--color-navbar-border)'
@@ -116,31 +115,31 @@ export function Navigation() {
         <div className="h-full px-6 flex items-center justify-between max-w-[1920px] mx-auto">
           {/* Left Section: Brand & System ID */}
           <div className="flex items-center gap-3">
-            <span 
+            <span
               className="font-semibold"
-              style={{ 
+              style={{
                 fontSize: '16px',
                 color: 'var(--color-teal-primary)'
               }}
             >
               rhythmDerby
             </span>
-            <span 
+            <span
               className="tech-mono"
-              style={{ 
+              style={{
                 fontSize: '9px',
                 color: 'var(--color-text-tertiary)'
               }}
             >
               SYS-v2.4.1
             </span>
-            <div 
+            <div
               className="w-px bg-current opacity-30"
               style={{ height: '16px' }}
             />
-            <span 
+            <span
               className="tech-mono"
-              style={{ 
+              style={{
                 fontSize: '10px',
                 color: 'var(--color-text-tertiary)'
               }}
@@ -152,7 +151,7 @@ export function Navigation() {
           {/* Center Section: Navigation Modules (Desktop) */}
           <div className="hidden lg:flex items-center gap-2">
             {navRoutes.map((route) => {
-              const isActive = pathname === route.href || 
+              const isActive = pathname === route.href ||
                 (route.href !== '/' && pathname.startsWith(route.href));
 
               return (
@@ -176,9 +175,9 @@ export function Navigation() {
           <div className="hidden md:flex items-center gap-4">
             {/* Energy Indicator */}
             <div className="flex items-center gap-2">
-              <span 
+              <span
                 className="tech-mono"
-                style={{ 
+                style={{
                   fontSize: '10px',
                   color: 'var(--color-text-tertiary)',
                   fontWeight: 600
@@ -186,13 +185,13 @@ export function Navigation() {
               >
                 [ENR]
               </span>
-              <div 
+              <div
                 className="relative bg-gray-200 rounded-sm overflow-hidden"
                 style={{ width: '40px', height: '4px' }}
               >
-                <div 
+                <div
                   className="absolute top-0 left-0 h-full transition-all"
-                  style={{ 
+                  style={{
                     width: energyBarWidth,
                     backgroundColor: 'var(--color-teal-primary)',
                     transitionDuration: 'var(--duration-250)',
@@ -200,9 +199,9 @@ export function Navigation() {
                   }}
                 />
               </div>
-              <span 
+              <span
                 className="tech-mono"
-                style={{ 
+                style={{
                   fontSize: '10px',
                   color: 'var(--color-text-primary)',
                   minWidth: '32px'
@@ -214,9 +213,9 @@ export function Navigation() {
 
             {/* Currency Display */}
             <div className="flex items-center gap-2">
-              <span 
+              <span
                 className="tech-mono"
-                style={{ 
+                style={{
                   fontSize: '12px',
                   color: 'var(--color-text-tertiary)',
                   fontWeight: 600
@@ -224,9 +223,9 @@ export function Navigation() {
               >
                 [¥]
               </span>
-              <span 
+              <span
                 className="tech-mono"
-                style={{ 
+                style={{
                   fontSize: '12px',
                   color: 'var(--color-text-primary)'
                 }}
@@ -247,17 +246,17 @@ export function Navigation() {
                 }}
               >
                 <span style={{ color: 'var(--color-teal-primary)' }}>◆</span>
-                <span 
+                <span
                   className="font-semibold"
-                  style={{ 
+                  style={{
                     fontSize: '12px',
                     color: 'var(--color-text-primary)'
                   }}
                 >
                   OPERATOR
                 </span>
-                <span 
-                  style={{ 
+                <span
+                  style={{
                     fontSize: '12px',
                     color: 'var(--color-text-secondary)'
                   }}
@@ -265,15 +264,15 @@ export function Navigation() {
                   {user.username}
                 </span>
                 <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>|</span>
-                <span 
+                <span
                   className="text-xs"
                   style={{ color: 'var(--color-text-tertiary)' }}
                 >
                   SYNC
                 </span>
-                <div 
+                <div
                   className="sync-pulse rounded-full"
-                  style={{ 
+                  style={{
                     width: '6px',
                     height: '6px',
                     backgroundColor: 'var(--color-sync-online)'
@@ -313,7 +312,7 @@ export function Navigation() {
                             }}
                           >
                             <Icon style={{ width: '16px', height: '16px', color: 'var(--color-text-tertiary)' }} />
-                            <span 
+                            <span
                               className="font-semibold"
                               style={{ color: 'var(--color-text-primary)' }}
                             >
@@ -322,9 +321,9 @@ export function Navigation() {
                           </button>
                         );
                       })}
-                      <div 
+                      <div
                         className="my-1 mx-4"
-                        style={{ 
+                        style={{
                           height: '1px',
                           backgroundColor: 'var(--border-subtle)'
                         }}
@@ -341,7 +340,7 @@ export function Navigation() {
                         }}
                       >
                         <LogOut style={{ width: '16px', height: '16px', color: 'var(--accent-danger)' }} />
-                        <span 
+                        <span
                           className="font-semibold"
                           style={{ color: 'var(--accent-danger)' }}
                         >
@@ -381,12 +380,12 @@ export function Navigation() {
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
               className="fixed inset-0 z-[90] lg:hidden"
-              style={{ 
+              style={{
                 backgroundColor: 'rgba(26, 29, 35, 0.4)',
                 backdropFilter: 'blur(4px)'
               }}
             />
-            
+
             {/* Menu Panel */}
             <motion.div
               initial={{ x: '100%' }}
@@ -404,7 +403,7 @@ export function Navigation() {
                 {/* Navigation Links */}
                 <div className="space-y-2 mb-6">
                   {navRoutes.map((route) => {
-                    const isActive = pathname === route.href || 
+                    const isActive = pathname === route.href ||
                       (route.href !== '/' && pathname.startsWith(route.href));
 
                     return (
@@ -426,9 +425,9 @@ export function Navigation() {
                 </div>
 
                 {/* Divider */}
-                <div 
+                <div
                   className="my-4"
-                  style={{ 
+                  style={{
                     height: '1px',
                     backgroundColor: 'var(--border-subtle)'
                   }}
@@ -437,18 +436,18 @@ export function Navigation() {
                 {/* Energy & Currency */}
                 <div className="space-y-3 mb-6">
                   <div className="flex items-center justify-between">
-                    <span 
+                    <span
                       className="tech-mono font-semibold"
-                      style={{ 
+                      style={{
                         fontSize: '11px',
                         color: 'var(--color-text-tertiary)'
                       }}
                     >
                       [ENR]
                     </span>
-                    <span 
+                    <span
                       className="tech-mono"
-                      style={{ 
+                      style={{
                         fontSize: '12px',
                         color: 'var(--color-text-primary)'
                       }}
@@ -457,18 +456,18 @@ export function Navigation() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span 
+                    <span
                       className="tech-mono font-semibold"
-                      style={{ 
+                      style={{
                         fontSize: '11px',
                         color: 'var(--color-text-tertiary)'
                       }}
                     >
                       [¥]
                     </span>
-                    <span 
+                    <span
                       className="tech-mono"
-                      style={{ 
+                      style={{
                         fontSize: '12px',
                         color: 'var(--color-text-primary)'
                       }}
@@ -479,9 +478,9 @@ export function Navigation() {
                 </div>
 
                 {/* Divider */}
-                <div 
+                <div
                   className="my-4"
-                  style={{ 
+                  style={{
                     height: '1px',
                     backgroundColor: 'var(--border-subtle)'
                   }}
@@ -505,7 +504,7 @@ export function Navigation() {
                         }}
                       >
                         <Icon style={{ width: '16px', height: '16px', color: 'var(--color-text-tertiary)' }} />
-                        <span 
+                        <span
                           className="font-semibold uppercase"
                           style={{ color: 'var(--color-text-primary)' }}
                         >
@@ -526,7 +525,7 @@ export function Navigation() {
                     }}
                   >
                     <LogOut style={{ width: '16px', height: '16px', color: 'var(--accent-danger)' }} />
-                    <span 
+                    <span
                       className="font-semibold uppercase"
                       style={{ color: 'var(--accent-danger)' }}
                     >
