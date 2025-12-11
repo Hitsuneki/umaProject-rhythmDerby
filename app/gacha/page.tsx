@@ -12,11 +12,13 @@ const SINGLE_PULL_COST = 100;
 const MULTI_PULL_COST = 900; // 10% discount
 
 interface GachaReward {
-  id: string;
-  rewardType: 'uma' | 'item';
-  rewardId: string;
-  rarity: string;
+  kind: 'ITEM' | 'UMA';
+  id: number;
   name: string;
+  code?: string;
+  type?: string;
+  rarity: string;
+  description?: string;
 }
 
 interface GachaHistoryItem {
@@ -236,7 +238,7 @@ export default function GachaPage() {
                     className={`p-4 rounded-xl bg-gradient-to-br ${getRarityColor(reward.rarity)} text-white text-center`}
                   >
                     <div className="text-3xl mb-2">
-                      {reward.rewardType === 'uma' ? '🏇' : '🎁'}
+                      {reward.kind === 'UMA' ? '🏇' : '🎁'}
                     </div>
                     <p className="font-display text-sm font-bold uppercase mb-1">
                       {reward.rarity}
@@ -244,6 +246,11 @@ export default function GachaPage() {
                     <p className="text-xs font-semibold">
                       {reward.name}
                     </p>
+                    {reward.code && (
+                      <p className="text-xs opacity-75 mt-1">
+                        {reward.code}
+                      </p>
+                    )}
                   </motion.div>
                 ))}
               </div>

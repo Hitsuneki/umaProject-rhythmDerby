@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const [rows] = await query(
       `SELECT 
-        ui.id,
+        ui.id AS userItemId,
         ui.item_id AS itemId,
         ui.quantity,
         i.code,
@@ -19,7 +19,7 @@ export async function GET() {
       FROM user_items ui
       JOIN items i ON i.id = ui.item_id
       WHERE ui.user_id = ?
-      ORDER BY i.type, i.name`,
+      ORDER BY i.name ASC`,
       [user.id]
     );
 
