@@ -46,9 +46,8 @@ export async function POST() {
 
         // Get random reward from gacha pool
         const [poolRows]: any = await conn.execute(
-            `SELECT id, reward_type, reward_ref_id, rarity, drop_weight 
-       FROM gacha_pool 
-       WHERE is_active = 1`
+            `SELECT id, reward_type, reward_ref_id, rarity, weight 
+       FROM gacha_pool`
         );
 
         if (!poolRows || poolRows.length === 0) {
@@ -57,12 +56,12 @@ export async function POST() {
         }
 
         // Weighted random selection
-        const totalWeight = poolRows.reduce((sum: number, item: any) => sum + item.drop_weight, 0);
+        const totalWeight = poolRows.reduce((sum: number, item: any) => sum + item.weight, 0);
         let random = Math.random() * totalWeight;
 
         let selectedReward: any = null;
         for (const item of poolRows) {
-            random -= item.drop_weight;
+            random -= item.weight;
             if (random <= 0) {
                 selectedReward = item;
                 break;
@@ -80,54 +79,74 @@ export async function POST() {
             [user.id, selectedReward.id, selectedReward.reward_type, selectedReward.reward_ref_id]
         );
 
-        // Process reward based on type
-        let rewardName = 'Unknown';
+        // Fetch full reward details based on type
+        let rewardDetail: any = null;
 
-        if (selectedReward.reward_type === 'item') {
-            // Check if user already has this item
-            const [existingItem]: any = await conn.execute(
-                'SELECT quantity FROM user_items WHERE user_id = ? AND item_code = ?',
-                [user.id, selectedReward.reward_ref_id]
-            );
-
-            if (existingItem && existingItem.length > 0) {
-                // Increment quantity
-                await conn.execute(
-                    'UPDATE user_items SET quantity = quantity + 1 WHERE user_id = ? AND item_code = ?',
-                    [user.id, selectedReward.reward_ref_id]
-                );
-            } else {
-                // Add new item
-                await conn.execute(
-                    'INSERT INTO user_items (user_id, item_code, quantity) VALUES (?, ?, 1)',
-                    [user.id, selectedReward.reward_ref_id]
-                );
-            }
-
-            // Get item name
+        if (selectedReward.reward_type === 'ITEM') {
+            // Get item details (items table does NOT have rarity column)
             const [itemRows]: any = await conn.execute(
-                'SELECT name FROM items WHERE code = ?',
+                'SELECT id, code, name, type, description FROM items WHERE id = ?',
                 [selectedReward.reward_ref_id]
             );
+
             if (itemRows && itemRows.length > 0) {
-                rewardName = itemRows[0].name;
+                const item = itemRows[0];
+
+                // Check if user already has this item
+                const [existingItem]: any = await conn.execute(
+                    'SELECT id, quantity FROM user_items WHERE user_id = ? AND item_id = ?',
+                    [user.id, item.id]
+                );
+
+                if (existingItem && existingItem.length > 0) {
+                    // Increment quantity
+                    await conn.execute(
+                        'UPDATE user_items SET quantity = quantity + 1 WHERE user_id = ? AND item_id = ?',
+                        [user.id, item.id]
+                    );
+                } else {
+                    // Add new item
+                    await conn.execute(
+                        'INSERT INTO user_items (user_id, item_id, quantity) VALUES (?, ?, 1)',
+                        [user.id, item.id]
+                    );
+                }
+
+                rewardDetail = {
+                    kind: 'ITEM',
+                    id: item.id,
+                    code: item.code,
+                    name: item.name,
+                    type: item.type,
+                    rarity: selectedReward.rarity, // From gacha_pool, NOT items table
+                    description: item.description,
+                };
             }
-        } else if (selectedReward.reward_type === 'uma') {
-            // For uma rewards, you might want to create a new uma_character
-            // This is a simplified version - adjust based on your schema
-            rewardName = `Uma Character #${selectedReward.reward_ref_id}`;
+        } else if (selectedReward.reward_type === 'UMA') {
+            // Get UMA details (assuming there's a uma_templates or similar table)
+            // For now, return basic info
+            rewardDetail = {
+                kind: 'UMA',
+                id: selectedReward.reward_ref_id,
+                name: `UMA Character #${selectedReward.reward_ref_id}`,
+                rarity: selectedReward.rarity,
+            };
+        }
+
+        // Fallback if no details found
+        if (!rewardDetail) {
+            rewardDetail = {
+                kind: selectedReward.reward_type,
+                id: selectedReward.reward_ref_id,
+                name: 'Unknown',
+                rarity: selectedReward.rarity,
+            };
         }
 
         await conn.commit();
 
         return NextResponse.json({
-            reward: {
-                id: selectedReward.id,
-                rewardType: selectedReward.reward_type,
-                rewardId: selectedReward.reward_ref_id,
-                rarity: selectedReward.rarity,
-                name: rewardName,
-            },
+            reward: rewardDetail,
             newBalance,
         });
     } catch (error) {

@@ -3,212 +3,542 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, Users, Zap, Trophy, BarChart3, Package, Sparkles, UserCircle, ChevronDown, LogOut, Trash2 } from 'lucide-react';
+import { Menu, X, LogOut, User, Settings, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/stores/authStore';
 
-const navItems = [
-  { href: '/', label: 'Dashboard', icon: Home },
-  { href: '/characters', label: 'Characters', icon: Users },
-  { href: '/training', label: 'Training', icon: Zap },
-  { href: '/racing', label: 'Racing', icon: Trophy },
-  { href: '/inventory', label: 'Inventory', icon: Package },
-  { href: '/gacha', label: 'Gacha', icon: Sparkles },
-  { href: '/history', label: 'History', icon: BarChart3 },
+// Navigation routes configuration
+const navRoutes = [
+  { href: '/', label: 'DASHBOARD' },
+  { href: '/characters', label: 'STABLE' },
+  { href: '/racing', label: 'RACING' },
+  { href: '/inventory', label: 'INVENTORY'},
+  { href: '/gacha', label: 'MARKET' },
+  { href: '/history', label: 'STATS' },
+];
+
+// Dropdown menu items
+const dropdownItems = [
+  { icon: User, label: 'PROFILE', action: 'profile' as const },
+  { icon: Settings, label: 'SETTINGS', action: 'settings' as const },
+  { icon: Activity, label: 'ACTIVITY', action: 'activity' as const },
 ];
 
 export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, logout, deleteAccount } = useAuthStore();
+  const { user, isAuthenticated, logout, fetchUser } = useAuthStore();
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [energy, setEnergy] = useState(73); // Mock energy - would come from API
+  const [maxEnergy] = useState(100);
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user data on mount and periodically
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUser();
+      const interval = setInterval(fetchUser, 30000); // Update every 30s
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, fetchUser]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
-        setShowDeleteConfirm(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isDropdownOpen]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = () => {
     logout();
     setIsDropdownOpen(false);
+    setIsMobileMenuOpen(false);
     router.push('/login');
   };
 
-  const handleDeleteAccount = async () => {
-    const success = await deleteAccount();
-    if (success) {
-      setIsDropdownOpen(false);
-      setShowDeleteConfirm(false);
-      router.push('/login');
+  const handleDropdownAction = (action: string) => {
+    setIsDropdownOpen(false);
+    // Handle different actions
+    switch (action) {
+      case 'profile':
+        // Navigate to profile page when implemented
+        break;
+      case 'settings':
+        // Navigate to settings page when implemented
+        break;
+      case 'activity':
+        // Navigate to activity page when implemented
+        break;
     }
   };
 
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-lg border-b shadow-sm" style={{ backgroundColor: 'var(--panel-bg)', borderColor: 'var(--border)' }}>
-      <div className="max-w-7xl mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--accent)' }}>
-              <Trophy className="w-6 h-6 text-white" style={{ width: '24px', height: '24px', color: 'white' }} />
-            </div>
-            <span className="font-display text-xl font-bold uppercase tracking-wider" style={{ color: 'var(--charcoal)' }}>
-              Uma Project
-            </span>
-          </Link>
+  const formatCurrency = (amount: number): string => {
+    return amount.toLocaleString('en-US');
+  };
 
-          <div className="flex items-center gap-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href || 
-                (item.href !== '/' && pathname.startsWith(item.href));
+  const formatNodeId = (userId: string): string => {
+    return userId.substring(0, 8).toUpperCase();
+  };
+
+  const energyPercentage = Math.round((energy / maxEnergy) * 100);
+  const energyBarWidth = `${energyPercentage}%`;
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* Desktop & Tablet Navbar */}
+      <nav
+        className="fixed top-0 left-0 right-0 z-[100] border-b"
+        style={{
+          height: 'var(--navbar-height)',
+          backgroundColor: 'var(--color-navbar-bg)',
+          borderColor: 'var(--color-navbar-border)'
+        }}
+      >
+        <div className="h-full px-6 flex items-center justify-between max-w-[1920px] mx-auto">
+          {/* Left Section: Brand & System ID */}
+          <div className="flex items-center gap-3">
+            <span
+              className="font-semibold"
+              style={{
+                fontSize: '16px',
+                color: 'var(--color-teal-primary)'
+              }}
+            >
+              rhythmDerby
+            </span>
+            <span
+              className="tech-mono"
+              style={{
+                fontSize: '9px',
+                color: 'var(--color-text-tertiary)'
+              }}
+            >
+              SYS-v2.4.1
+            </span>
+            <div
+              className="w-px bg-current opacity-30"
+              style={{ height: '16px' }}
+            />
+            <span
+              className="tech-mono"
+              style={{
+                fontSize: '10px',
+                color: 'var(--color-text-tertiary)'
+              }}
+            >
+              NODE-{formatNodeId(user.id)}
+            </span>
+          </div>
+
+          {/* Center Section: Navigation Modules (Desktop) */}
+          <div className="hidden lg:flex items-center gap-2">
+            {navRoutes.map((route) => {
+              const isActive = pathname === route.href ||
+                (route.href !== '/' && pathname.startsWith(route.href));
 
               return (
-                <Link key={item.href} href={item.href}>
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="relative px-4 py-2 rounded-lg flex items-center gap-2 font-display text-sm uppercase tracking-wide transition-colors"
-                    style={{ color: isActive ? 'var(--accent)' : 'var(--grey-dark)' }}
+                <Link key={route.href} href={route.href}>
+                  <div
+                    className="nav-link nav-link-underline relative"
+                    style={{
+                      color: isActive ? 'var(--color-teal-primary)' : 'var(--color-text-secondary)',
+                      backgroundColor: isActive ? 'var(--color-navbar-hover)' : 'transparent',
+                      borderLeft: isActive ? '2px solid var(--color-teal-primary)' : '2px solid transparent',
+                    }}
                   >
-                    <Icon className="w-4 h-4" style={{ width: '16px', height: '16px' }} />
-                    <span className="hidden md:inline">{item.label}</span>
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeNav"
-                        className="absolute inset-0 rounded-lg -z-10"
-                        style={{ backgroundColor: 'rgba(255, 79, 0, 0.1)' }}
-                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                  </motion.div>
+                    {route.label}
+                  </div>
                 </Link>
               );
             })}
+          </div>
 
-            {/* User Profile Dropdown */}
-            {isAuthenticated && user && (
-              <div className="relative ml-6" ref={dropdownRef}>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg border-2 transition-all shadow-sm"
-                  style={{ 
-                    backgroundColor: 'var(--panel-bg)', 
-                    borderColor: isDropdownOpen ? 'var(--accent)' : 'var(--border)' 
+          {/* Right Section: User Console (Desktop) */}
+          <div className="hidden md:flex items-center gap-4">
+            {/* Energy Indicator */}
+            <div className="flex items-center gap-2">
+              <span
+                className="tech-mono"
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 600
+                }}
+              >
+                [ENR]
+              </span>
+              <div
+                className="relative bg-gray-200 rounded-sm overflow-hidden"
+                style={{ width: '40px', height: '4px' }}
+              >
+                <div
+                  className="absolute top-0 left-0 h-full transition-all"
+                  style={{
+                    width: energyBarWidth,
+                    backgroundColor: 'var(--color-teal-primary)',
+                    transitionDuration: 'var(--duration-250)',
+                    transitionTimingFunction: 'ease-out'
+                  }}
+                />
+              </div>
+              <span
+                className="tech-mono"
+                style={{
+                  fontSize: '10px',
+                  color: 'var(--color-text-primary)',
+                  minWidth: '32px'
+                }}
+              >
+                {energyPercentage}%
+              </span>
+            </div>
+
+            {/* Currency Display */}
+            <div className="flex items-center gap-2">
+              <span
+                className="tech-mono"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-tertiary)',
+                  fontWeight: 600
+                }}
+              >
+                [¥]
+              </span>
+              <span
+                className="tech-mono"
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--color-text-primary)'
+                }}
+              >
+                {formatCurrency(user.currency_balance)}
+              </span>
+            </div>
+
+            {/* User Status Panel */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-2 rounded border transition-colors"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  borderColor: isDropdownOpen ? 'var(--color-teal-primary)' : 'var(--border-primary)',
+                  fontSize: '12px'
+                }}
+              >
+                <span style={{ color: 'var(--color-teal-primary)' }}>◆</span>
+                <span
+                  className="font-semibold"
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--color-text-primary)'
                   }}
                 >
-                  {/* Profile Picture */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-display font-bold text-lg shadow-md" style={{ backgroundImage: 'linear-gradient(to bottom right, var(--accent), var(--accent-dark))' }}>
-                    {user.username.charAt(0).toUpperCase()}
-                  </div>
-                  
-                  {/* User Info */}
-                  <div className="hidden md:flex flex-col items-start">
-                    <span className="font-display text-sm font-semibold leading-tight" style={{ color: 'var(--charcoal)' }}>
-                      {user.username}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--grey-dark)' }}>
-                      Trainer
-                    </span>
-                  </div>
+                  OPERATOR
+                </span>
+                <span
+                  style={{
+                    fontSize: '12px',
+                    color: 'var(--color-text-secondary)'
+                  }}
+                >
+                  {user.username}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>|</span>
+                <span
+                  className="text-xs"
+                  style={{ color: 'var(--color-text-tertiary)' }}
+                >
+                  SYNC
+                </span>
+                <div
+                  className="sync-pulse rounded-full"
+                  style={{
+                    width: '6px',
+                    height: '6px',
+                    backgroundColor: 'var(--color-sync-online)'
+                  }}
+                />
+              </button>
 
-                  {/* Dropdown Arrow */}
-                  <ChevronDown 
-                    className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
-                    style={{ width: '20px', height: '20px', color: 'var(--grey-dark)' }}
-                  />
-                </motion.button>
-
-                {/* Dropdown Menu */}
-                <AnimatePresence>
-                  {isDropdownOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                      className="absolute right-0 mt-3 w-56 backdrop-blur-lg border-2 rounded-xl shadow-2xl overflow-hidden z-50"
-                      style={{ backgroundColor: 'var(--panel-bg)', borderColor: 'var(--border)' }}
-                    >
-                      {!showDeleteConfirm ? (
-                        <div className="py-2">
+              {/* Dropdown Menu */}
+              <AnimatePresence>
+                {isDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 mt-2 border rounded-lg shadow-lg overflow-hidden"
+                    style={{
+                      width: '200px',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderColor: 'var(--border-primary)'
+                    }}
+                  >
+                    <div className="py-1">
+                      {dropdownItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
                           <button
-                            onClick={handleLogout}
-                            className="w-full px-5 py-3.5 flex items-center gap-3 text-left transition-colors group"
-                            style={{ 
-                              backgroundColor: 'transparent',
+                            key={item.action}
+                            onClick={() => handleDropdownAction(item.action)}
+                            className="w-full px-4 py-2 flex items-center gap-3 text-left transition-colors"
+                            style={{ fontSize: '12px' }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.backgroundColor = 'var(--color-navbar-hover)';
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 79, 0, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }}
                           >
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: 'rgba(255, 79, 0, 0.1)' }}>
-                              <LogOut style={{ width: '20px', height: '20px', color: 'var(--accent)' }} />
-                            </div>
-                            <span className="text-sm font-display font-semibold uppercase tracking-wide" style={{ color: 'var(--charcoal)' }}>
-                              Logout
+                            <Icon style={{ width: '16px', height: '16px', color: 'var(--color-text-tertiary)' }} />
+                            <span
+                              className="font-semibold"
+                              style={{ color: 'var(--color-text-primary)' }}
+                            >
+                              [{item.label.split(' ')[0]}] {item.label.split(' ').slice(1).join(' ')}
                             </span>
                           </button>
-
-                          {/* Delete Account Button */}
-                          <button
-                            onClick={() => setShowDeleteConfirm(true)}
-                            className="w-full px-5 py-3.5 flex items-center gap-3 text-left transition-colors group"
-                            style={{ backgroundColor: 'transparent' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                          >
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
-                              <Trash2 style={{ width: '20px', height: '20px', color: '#ef4444' }} />
-                            </div>
-                            <span className="text-sm font-display font-semibold uppercase tracking-wide" style={{ color: '#ef4444' }}>
-                              Delete Account
-                            </span>
-                          </button>
-                        </div>
-                      ) : (
-                        /* Delete Confirmation */
-                        <div className="px-5 py-4">
-                          <p className="text-sm font-medium mb-4 leading-relaxed" style={{ color: 'var(--charcoal)' }}>
-                            Are you sure you want to delete your account? This action cannot be undone.
-                          </p>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleDeleteAccount}
-                              className="flex-1 px-4 py-2.5 bg-red-500 text-white text-xs font-display font-bold uppercase tracking-wide rounded-lg hover:bg-red-600 transition-colors shadow-sm"
-                            >
-                              Delete
-                            </button>
-                            <button
-                              onClick={() => setShowDeleteConfirm(false)}
-                              className="flex-1 px-4 py-2.5 text-xs font-display font-bold uppercase tracking-wide rounded-lg transition-colors"
-                              style={{ backgroundColor: 'var(--grey-light)', color: 'var(--charcoal)' }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--grey-medium)'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--grey-light)'}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+                        );
+                      })}
+                      <div
+                        className="my-1 mx-4"
+                        style={{
+                          height: '1px',
+                          backgroundColor: 'var(--border-subtle)'
+                        }}
+                      />
+                      <button
+                        onClick={handleLogout}
+                        className="w-full px-4 py-2 flex items-center gap-3 text-left transition-colors"
+                        style={{ fontSize: '12px' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <LogOut style={{ width: '16px', height: '16px', color: 'var(--accent-danger)' }} />
+                        <span
+                          className="font-semibold"
+                          style={{ color: 'var(--accent-danger)' }}
+                        >
+                          [EXIT] LOGOUT
+                        </span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2"
+            style={{ color: 'var(--color-text-primary)' }}
+          >
+            {isMobileMenuOpen ? (
+              <X style={{ width: '24px', height: '24px' }} />
+            ) : (
+              <Menu style={{ width: '24px', height: '24px' }} />
+            )}
+          </button>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Mobile Menu Drawer */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 z-[90] lg:hidden"
+              style={{
+                backgroundColor: 'rgba(26, 29, 35, 0.4)',
+                backdropFilter: 'blur(4px)'
+              }}
+            />
+
+            {/* Menu Panel */}
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'tween', duration: 0.3 }}
+              className="fixed right-0 top-0 bottom-0 z-[95] w-80 border-l shadow-xl lg:hidden overflow-y-auto"
+              style={{
+                backgroundColor: 'var(--bg-surface)',
+                borderColor: 'var(--border-primary)',
+                marginTop: 'var(--navbar-height)'
+              }}
+            >
+              <div className="p-6">
+                {/* Navigation Links */}
+                <div className="space-y-2 mb-6">
+                  {navRoutes.map((route) => {
+                    const isActive = pathname === route.href ||
+                      (route.href !== '/' && pathname.startsWith(route.href));
+
+                    return (
+                      <Link key={route.href} href={route.href}>
+                        <div
+                          className="px-4 py-3 rounded font-semibold uppercase tracking-wide transition-colors"
+                          style={{
+                            fontSize: '12px',
+                            color: isActive ? 'var(--color-teal-primary)' : 'var(--color-text-primary)',
+                            backgroundColor: isActive ? 'var(--color-navbar-hover)' : 'transparent',
+                            borderLeft: isActive ? '2px solid var(--color-teal-primary)' : '2px solid transparent',
+                          }}
+                        >
+                          {route.label}
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+
+                {/* Divider */}
+                <div
+                  className="my-4"
+                  style={{
+                    height: '1px',
+                    backgroundColor: 'var(--border-subtle)'
+                  }}
+                />
+
+                {/* Energy & Currency */}
+                <div className="space-y-3 mb-6">
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="tech-mono font-semibold"
+                      style={{
+                        fontSize: '11px',
+                        color: 'var(--color-text-tertiary)'
+                      }}
+                    >
+                      [ENR]
+                    </span>
+                    <span
+                      className="tech-mono"
+                      style={{
+                        fontSize: '12px',
+                        color: 'var(--color-text-primary)'
+                      }}
+                    >
+                      {energyPercentage}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span
+                      className="tech-mono font-semibold"
+                      style={{
+                        fontSize: '11px',
+                        color: 'var(--color-text-tertiary)'
+                      }}
+                    >
+                      [¥]
+                    </span>
+                    <span
+                      className="tech-mono"
+                      style={{
+                        fontSize: '12px',
+                        color: 'var(--color-text-primary)'
+                      }}
+                    >
+                      {formatCurrency(user.currency_balance)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  className="my-4"
+                  style={{
+                    height: '1px',
+                    backgroundColor: 'var(--border-subtle)'
+                  }}
+                />
+
+                {/* User Actions */}
+                <div className="space-y-2">
+                  {dropdownItems.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.action}
+                        onClick={() => handleDropdownAction(item.action)}
+                        className="w-full px-4 py-3 flex items-center gap-3 text-left rounded transition-colors"
+                        style={{ fontSize: '12px' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'var(--color-navbar-hover)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }}
+                      >
+                        <Icon style={{ width: '16px', height: '16px', color: 'var(--color-text-tertiary)' }} />
+                        <span
+                          className="font-semibold uppercase"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          [{item.label.split(' ')[0]}] {item.label.split(' ').slice(1).join(' ')}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-3 flex items-center gap-3 text-left rounded transition-colors"
+                    style={{ fontSize: '12px' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <LogOut style={{ width: '16px', height: '16px', color: 'var(--accent-danger)' }} />
+                    <span
+                      className="font-semibold uppercase"
+                      style={{ color: 'var(--accent-danger)' }}
+                    >
+                      [EXIT] LOGOUT
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
