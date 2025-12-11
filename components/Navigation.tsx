@@ -12,6 +12,7 @@ const navRoutes = [
   { href: '/', label: 'DASHBOARD' },
   { href: '/characters', label: 'STABLE' },
   { href: '/racing', label: 'RACING' },
+  { href: '/inventory', label: 'INVENTORY'},
   { href: '/gacha', label: 'MARKET' },
   { href: '/history', label: 'STATS' },
 ];

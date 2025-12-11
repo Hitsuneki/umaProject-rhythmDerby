@@ -159,15 +159,15 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50 relative overflow-hidden">
       {/* Animated Background Grid */}
       <div className="absolute inset-0 opacity-20">
-        <motion.div 
+        <motion.div
           className="absolute inset-0 grid-pattern"
-          animate={{ 
+          animate={{
             backgroundPosition: ['0px 0px', '32px 32px'],
           }}
-          transition={{ 
-            duration: 20, 
-            repeat: Infinity, 
-            ease: 'linear' 
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: 'linear'
           }}
         />
       </div>
@@ -177,10 +177,10 @@ export default function Dashboard() {
         className="absolute inset-0 pointer-events-none"
         initial={{ y: '-100vh' }}
         animate={{ y: '100vh' }}
-        transition={{ 
-          duration: 8, 
-          repeat: Infinity, 
-          ease: 'linear' 
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          ease: 'linear'
         }}
       >
         <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
@@ -199,13 +199,13 @@ export default function Dashboard() {
           <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
             <motion.div
               className="w-full bg-gradient-to-b from-transparent via-cyan-500/30 to-transparent h-32"
-              animate={{ 
+              animate={{
                 y: ['-100%', '400%'],
               }}
-              transition={{ 
-                duration: 4, 
-                repeat: Infinity, 
-                ease: 'linear' 
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'linear'
               }}
             />
           </div>
@@ -253,10 +253,9 @@ export default function Dashboard() {
               ].map((module, i) => (
                 <div key={module.label} className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <motion.div 
-                      className={`w-2 h-2 rounded-full ${
-                        module.color === 'green' ? 'bg-green-500' : 'bg-gray-400'
-                      }`}
+                    <motion.div
+                      className={`w-2 h-2 rounded-full ${module.color === 'green' ? 'bg-green-500' : 'bg-gray-400'
+                        }`}
                       animate={{ opacity: [1, 0.5, 1] }}
                       transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
                     />
@@ -298,11 +297,10 @@ export default function Dashboard() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 + index * 0.05 }}
                     onClick={() => selectUma(uma.id)}
-                    className={`w-full text-left px-3 py-2 font-mono text-xs transition-all relative group ${
-                      isSelected 
-                        ? 'bg-cyan-50 border-l-2 border-cyan-600' 
+                    className={`w-full text-left px-3 py-2 font-mono text-xs transition-all relative group ${isSelected
+                        ? 'bg-cyan-50 border-l-2 border-cyan-600'
                         : 'hover:bg-gray-50 border-l-2 border-transparent'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -350,7 +348,7 @@ export default function Dashboard() {
                       MODULE: DASHBOARD | CHANNEL: OPERATOR | ACTIVE UMA: {selectedUma.name.toUpperCase()}
                     </p>
                     <div className="flex items-center gap-2">
-                      <motion.div 
+                      <motion.div
                         className="w-2 h-2 bg-green-500 rounded-full"
                         animate={{ opacity: [1, 0.3, 1] }}
                         transition={{ duration: 2, repeat: Infinity }}
@@ -367,10 +365,10 @@ export default function Dashboard() {
                     className="absolute inset-0 pointer-events-none"
                     initial={{ y: '-120px' }}
                     animate={{ y: 'calc(100% + 120px)' }}
-                    transition={{ 
-                      duration: 4, 
-                      repeat: Infinity, 
-                      ease: 'linear' 
+                    transition={{
+                      duration: 4,
+                      repeat: Infinity,
+                      ease: 'linear'
                     }}
                   >
                     <div className="w-full h-[120px] bg-gradient-to-b from-transparent via-cyan-500/5 to-transparent" />
@@ -420,9 +418,8 @@ export default function Dashboard() {
                                 {stat.value}/{stat.max}
                               </span>
                               {stat.change && (
-                                <span className={`text-xs font-mono w-12 ${
-                                  stat.change === 'MAX' ? 'text-green-600 font-bold' : 'text-cyan-600'
-                                }`}>
+                                <span className={`text-xs font-mono w-12 ${stat.change === 'MAX' ? 'text-green-600 font-bold' : 'text-cyan-600'
+                                  }`}>
                                   [{stat.change}]
                                 </span>
                               )}
@@ -475,19 +472,18 @@ export default function Dashboard() {
                             <span className="text-gray-400">NO TRAINING HISTORY AVAILABLE</span>
                           </div>
                         )}
-                        
+
                         {raceHistory.length > 0 ? (
                           <div className="flex items-center gap-2">
                             <span className="text-gray-400">[LOG]</span>
                             <span>LAST RACE:</span>
                             <span className="text-gray-900">{formatTimestamp(raceHistory[0].startTime)}</span>
                             <span>|</span>
-                            <span className={`font-bold ${
-                              raceHistory[0].placement === 1 ? 'text-green-600' :
-                              raceHistory[0].placement === 2 ? 'text-cyan-600' :
-                              raceHistory[0].placement === 3 ? 'text-orange-600' :
-                              'text-gray-600'
-                            }`}>
+                            <span className={`font-bold ${raceHistory[0].placement === 1 ? 'text-green-600' :
+                                raceHistory[0].placement === 2 ? 'text-cyan-600' :
+                                  raceHistory[0].placement === 3 ? 'text-orange-600' :
+                                    'text-gray-600'
+                              }`}>
                               #{raceHistory[0].placement}
                             </span>
                             <span>|</span>
