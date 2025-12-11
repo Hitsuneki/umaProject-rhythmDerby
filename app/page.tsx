@@ -18,11 +18,10 @@ import type { Uma } from '@/types';
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user } = useAuthStore();
+  const { user, fetchUser } = useAuthStore();
   const { umas, selectedUmaId, selectUma, regenerateEnergy, getTimeToNextEnergy, fetchUmas, loading, error } = useUmaStore();
   const { getLatestLog } = useTrainingStore();
   const { getLatestRace } = useRaceStore();
-  const { balance } = useCurrencyStore();
   const [mounted, setMounted] = useState(false);
   const [timeToNext, setTimeToNext] = useState(0);
 
@@ -30,7 +29,9 @@ export default function Dashboard() {
     setMounted(true);
     // Fetch characters from API on mount
     fetchUmas();
-  }, [fetchUmas]);
+    // Fetch latest user data to sync currency_balance
+    fetchUser();
+  }, [fetchUmas, fetchUser]);
 
   // Select first uma if none selected
   useEffect(() => {
@@ -111,7 +112,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-3 px-4 py-2 border rounded" style={{ borderColor: 'var(--border-secondary)', background: 'var(--bg-secondary)' }}>
               <Star className="w-5 h-5" style={{ color: 'var(--accent-warning)' }} />
               <span className="tech-mono text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                {balance}
+                {user?.currency_balance?.toLocaleString() || 0}
               </span>
               <span className="text-sm" style={{ color: 'var(--text-tertiary)' }}>COINS</span>
             </div>
@@ -150,7 +151,7 @@ export default function Dashboard() {
                 {umas.map((uma, index) => {
                   const isSelected = uma.id === selectedUmaId;
                   const power = calculateOverallPower(uma);
-                  
+
                   return (
                     <motion.button
                       key={uma.id}

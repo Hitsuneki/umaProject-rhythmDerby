@@ -10,7 +10,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { register } = useAuthStore();
+  const { register, user } = useAuthStore();
   const { isMobile } = useResponsive();
   const [formData, setFormData] = useState({
     email: '',
@@ -23,40 +23,97 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  /* Validation State */
+  const [fieldErrors, setFieldErrors] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+
+  const validateForm = () => {
+    const errors = { username: '', email: '', password: '', confirmPassword: '' };
+    let isValid = true;
+
+    // Username Validation
+    if (!formData.username) {
+      errors.username = 'OPERATOR NAME IS REQUIRED';
+      isValid = false;
+    } else if (formData.username.length < 3) {
+      errors.username = 'NAME TOO SHORT (MIN 3 CHARS)';
+      isValid = false;
+    }
+
+    // Email Validation
+    if (!formData.email) {
+      errors.email = 'EMAIL IS REQUIRED';
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.email = 'INVALID EMAIL FORMAT';
+      isValid = false;
+    }
+
+    // Password Validation
+    if (!formData.password) {
+      errors.password = 'PASSWORD IS REQUIRED';
+      isValid = false;
+    } else if (formData.password.length < 8) {
+      errors.password = 'PASSWORD TOO SHORT (MIN 8 CHARS)';
+      isValid = false;
+    } else if (!/[A-Z]/.test(formData.password) || !/[0-9]/.test(formData.password)) {
+      // Optional complexity check, keeping it simple for now but adding the hook
+      // errors.password = 'WEAK PASSWORD (REQ: UPPERCASE & NUMBER)'; 
+      // isValid = false; 
+    }
+
+    // Confirm Password Validation
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'PASSWORDS DO NOT MATCH';
+      isValid = false;
+    }
+
+    setFieldErrors(errors);
+    return isValid;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateForm()) return;
+
     setIsLoading(true);
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('PASSWORD MISMATCH - CONFIRMATION FAILED');
-      setIsLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('SECURITY ERROR - PASSWORD TOO SHORT (MIN 6 CHARS)');
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const result = await register(formData.email, formData.username, formData.password);
       if (result.success) {
-        router.push('/');
+        // Show success state briefly
+        setTimeout(() => router.push('/'), 800);
       } else {
-        setError(result.message?.toUpperCase() || 'REGISTRATION FAILED - SYSTEM ERROR');
+        const msg = result.message?.toUpperCase() || 'REGISTRATION FAILED - SYSTEM ERROR';
+        setError(msg);
+
+        // Map server errors to fields
+        if (msg.includes('EMAIL') && msg.includes('EXIST')) {
+          setFieldErrors(prev => ({ ...prev, email: 'EMAIL ALREADY REGISTERED' }));
+        } else if (msg.includes('USERNAME') && msg.includes('EXIST')) {
+          setFieldErrors(prev => ({ ...prev, username: 'OPERATOR NAME ALREADY TAKEN' }));
+        }
       }
     } catch (err) {
       setError('SYSTEM ERROR - CONNECTION TIMEOUT');
     } finally {
-      setIsLoading(false);
+      if (!user) {
+        setIsLoading(false);
+      }
     }
   };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear specific field error
+    if (field in fieldErrors) {
+      setFieldErrors(prev => ({ ...prev, [field]: '' }));
+    }
     if (error) setError('');
   };
 
@@ -65,15 +122,15 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-gray-50 relative overflow-hidden">
       {/* Animated Background Grid */}
       <div className="absolute inset-0 opacity-20">
-        <motion.div 
+        <motion.div
           className="absolute inset-0 grid-pattern"
-          animate={{ 
+          animate={{
             backgroundPosition: ['0px 0px', '32px 32px'],
           }}
-          transition={{ 
-            duration: 20, 
-            repeat: Infinity, 
-            ease: 'linear' 
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            ease: 'linear'
           }}
         />
       </div>
@@ -83,10 +140,10 @@ export default function RegisterPage() {
         className="absolute inset-0 pointer-events-none"
         initial={{ y: '-100vh' }}
         animate={{ y: '100vh' }}
-        transition={{ 
-          duration: 8, 
-          repeat: Infinity, 
-          ease: 'linear' 
+        transition={{
+          duration: 8,
+          repeat: Infinity,
+          ease: 'linear'
         }}
       >
         <div className="w-full h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent" />
@@ -96,26 +153,26 @@ export default function RegisterPage() {
       <div className="absolute top-0 left-0 w-full h-1 overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-r from-transparent via-cyan-500/40 to-transparent"
-          animate={{ 
+          animate={{
             x: ['-100%', '200%'],
           }}
-          transition={{ 
-            duration: 6, 
-            repeat: Infinity, 
-            ease: 'easeInOut' 
+          transition={{
+            duration: 6,
+            repeat: Infinity,
+            ease: 'easeInOut'
           }}
         />
       </div>
-      
+
       <div className="absolute bottom-0 right-0 w-full h-1 overflow-hidden">
         <motion.div
           className="h-full bg-gradient-to-l from-transparent via-orange-500/40 to-transparent"
-          animate={{ 
+          animate={{
             x: ['100%', '-200%'],
           }}
-          transition={{ 
-            duration: 8, 
-            repeat: Infinity, 
+          transition={{
+            duration: 8,
+            repeat: Infinity,
             ease: 'easeInOut',
             delay: 2
           }}
@@ -124,7 +181,7 @@ export default function RegisterPage() {
 
       <div className="relative z-10 min-h-screen flex">
         {/* Left Panel - System Status */}
-        <motion.div 
+        <motion.div
           className="hidden lg:flex lg:w-1/2 bg-white/90 backdrop-blur-sm border-r border-gray-200 flex-col justify-center p-12 relative"
           initial={{ opacity: 0, x: -50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -134,20 +191,20 @@ export default function RegisterPage() {
           <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
             <motion.div
               className="w-full bg-gradient-to-b from-transparent via-cyan-500/30 to-transparent h-32"
-              animate={{ 
+              animate={{
                 y: ['-100%', '400%'],
               }}
-              transition={{ 
-                duration: 4, 
-                repeat: Infinity, 
-                ease: 'linear' 
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: 'linear'
               }}
             />
           </div>
 
           <div className="space-y-8">
             {/* System Header */}
-            <motion.div 
+            <motion.div
               className="space-y-4"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -166,12 +223,12 @@ export default function RegisterPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="h-px bg-gradient-to-r from-cyan-500/50 via-cyan-500/20 to-transparent" />
             </motion.div>
 
             {/* System Status Grid */}
-            <motion.div 
+            <motion.div
               className="space-y-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -185,7 +242,7 @@ export default function RegisterPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <motion.div 
+                        <motion.div
                           className="w-2 h-2 bg-green-500 rounded-full"
                           animate={{ opacity: [1, 0.5, 1] }}
                           transition={{ duration: 2, repeat: Infinity }}
@@ -261,7 +318,7 @@ export default function RegisterPage() {
             </motion.div>
 
             {/* Neural Activity Visualization */}
-            <motion.div 
+            <motion.div
               className="relative"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -273,11 +330,11 @@ export default function RegisterPage() {
                     <motion.div
                       key={i}
                       className="w-1 bg-cyan-500/40 min-h-1"
-                      animate={{ 
+                      animate={{
                         height: [4, Math.random() * 60 + 8, 4],
                         opacity: [0.4, 0.8, 0.4]
                       }}
-                      transition={{ 
+                      transition={{
                         duration: 1.5 + Math.random() * 2,
                         repeat: Infinity,
                         delay: Math.random() * 2,
@@ -311,18 +368,18 @@ export default function RegisterPage() {
             className="w-full max-w-md relative"
           >
             {/* Register Card */}
-            <div className="bg-white border border-gray-200 shadow-lg overflow-hidden relative">
+            <div className={`bg-white border shadow-lg overflow-hidden relative transition-colors duration-300 ${error ? 'border-red-300' : 'border-gray-200'}`}>
               {/* Ambient Side Accent */}
               <div className="absolute right-0 top-0 w-1 h-full overflow-hidden">
                 <motion.div
-                  className="w-full bg-gradient-to-b from-cyan-500/30 via-transparent to-orange-500/30 h-full"
-                  animate={{ 
+                  className={`w-full h-full bg-gradient-to-b ${error ? 'from-red-500/30 via-orange-500/30 to-transparent' : 'from-cyan-500/30 via-transparent to-orange-500/30'}`}
+                  animate={{
                     backgroundPosition: ['0% 0%', '0% 100%'],
                   }}
-                  transition={{ 
-                    duration: 3, 
-                    repeat: Infinity, 
-                    ease: 'easeInOut' 
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
                   }}
                 />
               </div>
@@ -336,12 +393,14 @@ export default function RegisterPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <motion.div 
-                      className="w-2 h-2 bg-green-500 rounded-full"
+                    <motion.div
+                      className={`w-2 h-2 rounded-full ${error ? 'bg-red-500' : 'bg-green-500'}`}
                       animate={{ opacity: [1, 0.3, 1] }}
                       transition={{ duration: 2, repeat: Infinity }}
                     />
-                    <span className="text-xs font-mono text-gray-600 font-bold uppercase">SECURE</span>
+                    <span className={`text-xs font-mono font-bold uppercase ${error ? 'text-red-600' : 'text-gray-600'}`}>
+                      {error ? 'AUTH_FAIL' : 'SECURE'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -349,7 +408,7 @@ export default function RegisterPage() {
               {/* Card Content */}
               <div className="p-6 space-y-6 relative">
                 {/* Title Section */}
-                <motion.div 
+                <motion.div
                   className="text-center space-y-3"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -391,16 +450,16 @@ export default function RegisterPage() {
                 </AnimatePresence>
 
                 {/* Register Form */}
-                <motion.form 
-                  onSubmit={handleSubmit} 
+                <motion.form
+                  onSubmit={handleSubmit}
                   className="space-y-5"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.6 }}
                 >
                   {/* Operator Name Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.username ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       OPERATOR NAME
                     </label>
                     <div className="relative">
@@ -410,11 +469,14 @@ export default function RegisterPage() {
                         onChange={(e) => handleInputChange('username', e.target.value)}
                         onFocus={() => setFocusedField('username')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.username
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="trainer_001"
                         required
                       />
-                      {focusedField === 'username' && (
+                      {focusedField === 'username' && !fieldErrors.username && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -422,15 +484,28 @@ export default function RegisterPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center">
-                        <div className="w-1 h-4 bg-gray-300" />
+                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center pointer-events-none">
+                        <div className={`w-1 h-4 transition-colors ${fieldErrors.username ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.username && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.username}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Email Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.email ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       OPERATOR EMAIL
                     </label>
                     <div className="relative">
@@ -440,11 +515,14 @@ export default function RegisterPage() {
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         onFocus={() => setFocusedField('email')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.email
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="trainer@rhythmderby.com"
                         required
                       />
-                      {focusedField === 'email' && (
+                      {focusedField === 'email' && !fieldErrors.email && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -452,15 +530,28 @@ export default function RegisterPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center">
-                        <div className="w-1 h-4 bg-gray-300" />
+                      <div className="absolute top-0 right-0 w-8 h-full flex items-center justify-center pointer-events-none">
+                        <div className={`w-1 h-4 transition-colors ${fieldErrors.email ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.email && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.email}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Password Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.password ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       ACCESS CODE
                     </label>
                     <div className="relative">
@@ -470,7 +561,10 @@ export default function RegisterPage() {
                         onChange={(e) => handleInputChange('password', e.target.value)}
                         onFocus={() => setFocusedField('password')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 pr-12 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.password
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="••••••••••••••••"
                         required
                       />
@@ -481,7 +575,7 @@ export default function RegisterPage() {
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                      {focusedField === 'password' && (
+                      {focusedField === 'password' && !fieldErrors.password && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -489,15 +583,28 @@ export default function RegisterPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-12 w-1 h-full flex items-center">
-                        <div className="w-full h-4 bg-gray-300" />
+                      <div className="absolute top-0 right-12 w-1 h-full flex items-center pointer-events-none">
+                        <div className={`w-full h-4 transition-colors ${fieldErrors.password ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.password && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.password}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Confirm Password Field */}
-                  <div className="space-y-2">
-                    <label className="block text-xs text-gray-600 uppercase tracking-wide font-mono font-bold">
+                  <div className="space-y-2 group">
+                    <label className={`block text-xs uppercase tracking-wide font-mono font-bold transition-colors ${fieldErrors.confirmPassword ? 'text-red-600' : 'text-gray-600 group-focus-within:text-cyan-600'}`}>
                       CONFIRM ACCESS CODE
                     </label>
                     <div className="relative">
@@ -507,7 +614,10 @@ export default function RegisterPage() {
                         onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
                         onFocus={() => setFocusedField('confirmPassword')}
                         onBlur={() => setFocusedField(null)}
-                        className="w-full px-4 py-3 pr-12 bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:border-cyan-600 focus:shadow-sm"
+                        className={`w-full px-4 py-3 pr-12 bg-gray-50 border text-gray-900 placeholder-gray-500 font-mono text-sm transition-all duration-300 focus:outline-none focus:bg-white focus:shadow-sm ${fieldErrors.confirmPassword
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-gray-200 focus:border-cyan-600'
+                          }`}
                         placeholder="••••••••••••••••"
                         required
                       />
@@ -518,7 +628,7 @@ export default function RegisterPage() {
                       >
                         {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
-                      {focusedField === 'confirmPassword' && (
+                      {focusedField === 'confirmPassword' && !fieldErrors.confirmPassword && (
                         <motion.div
                           className="absolute bottom-0 left-0 h-0.5 bg-cyan-600"
                           initial={{ width: 0 }}
@@ -526,17 +636,33 @@ export default function RegisterPage() {
                           transition={{ duration: 0.3 }}
                         />
                       )}
-                      <div className="absolute top-0 right-12 w-1 h-full flex items-center">
-                        <div className="w-full h-4 bg-gray-300" />
+                      <div className="absolute top-0 right-12 w-1 h-full flex items-center pointer-events-none">
+                        <div className={`w-full h-4 transition-colors ${fieldErrors.confirmPassword ? 'bg-red-300' : 'bg-gray-300'}`} />
                       </div>
                     </div>
+                    {/* Field Error Message */}
+                    <AnimatePresence>
+                      {fieldErrors.confirmPassword && (
+                        <motion.p
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="text-xs text-red-500 font-mono mt-1 font-medium"
+                        >
+                          {fieldErrors.confirmPassword}
+                        </motion.p>
+                      )}
+                    </AnimatePresence>
                   </div>
 
                   {/* Submit Button */}
                   <motion.button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-mono font-bold py-4 px-6 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 text-sm uppercase tracking-wide relative overflow-hidden group"
+                    className={`w-full font-mono font-bold py-4 px-6 transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50 text-sm uppercase tracking-wide relative overflow-hidden group ${user
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                      }`}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
@@ -546,7 +672,7 @@ export default function RegisterPage() {
                       animate={{ x: ['-100%', '200%'] }}
                       transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
                     />
-                    
+
                     {/* Button content */}
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-3">
@@ -555,7 +681,7 @@ export default function RegisterPage() {
                           transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                           className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
                         />
-                        <span>INITIALIZING...</span>
+                        <span>{user ? 'INITIALIZED - REDIRECTING...' : 'INITIALIZING OPERATOR...'}</span>
                         <div className="flex gap-1">
                           {[0, 1, 2].map((i) => (
                             <motion.div
@@ -577,7 +703,7 @@ export default function RegisterPage() {
                 </motion.form>
 
                 {/* Secondary Actions */}
-                <motion.div 
+                <motion.div
                   className="space-y-4 pt-4 border-t border-gray-200"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -586,8 +712,8 @@ export default function RegisterPage() {
                   <div className="text-center">
                     <p className="text-xs text-gray-600 font-mono mb-3">
                       Already have an account?{' '}
-                      <Link 
-                        href="/login" 
+                      <Link
+                        href="/login"
                         className="text-cyan-600 hover:text-cyan-700 font-bold uppercase tracking-wide transition-colors"
                       >
                         Initiate login sequence
@@ -595,14 +721,14 @@ export default function RegisterPage() {
                     </p>
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 text-center">
-                    <Link 
-                      href="/terms" 
+                    <Link
+                      href="/terms"
                       className="flex-1 text-xs text-gray-600 hover:text-cyan-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-cyan-600 bg-gray-50 hover:bg-cyan-50"
                     >
                       [AUTH] TERMS
                     </Link>
-                    <Link 
-                      href="/privacy" 
+                    <Link
+                      href="/privacy"
                       className="flex-1 text-xs text-gray-600 hover:text-cyan-600 transition-colors font-mono font-medium uppercase tracking-wide py-2 px-4 border border-gray-200 hover:border-cyan-600 bg-gray-50 hover:bg-cyan-50"
                     >
                       [AUTH] PRIVACY
@@ -619,7 +745,7 @@ export default function RegisterPage() {
                     <span className="uppercase">NODE: CN-01</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <motion.div 
+                    <motion.div
                       className="w-1 h-1 bg-green-500 rounded-full"
                       animate={{ opacity: [1, 0.3, 1] }}
                       transition={{ duration: 2, repeat: Infinity }}
@@ -631,7 +757,7 @@ export default function RegisterPage() {
             </div>
 
             {/* Security Footer */}
-            <motion.div 
+            <motion.div
               className="mt-6 text-center space-y-2"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -642,7 +768,7 @@ export default function RegisterPage() {
               </p>
               <div className="flex items-center justify-center gap-4 text-xs font-mono text-gray-500">
                 <div className="flex items-center gap-2">
-                  <motion.div 
+                  <motion.div
                     className="w-1 h-1 bg-green-500 rounded-full"
                     animate={{ opacity: [1, 0.3, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}

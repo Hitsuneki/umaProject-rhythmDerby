@@ -9,22 +9,23 @@ export async function GET() {
   try {
     const [raceRows] = await query(
       `SELECT 
-        id,
-        uma_id AS umaId,
-        distance_type AS distanceType,
-        start_time AS startTime,
-        end_time AS endTime,
-        start_quality AS startQuality,
-        mid_quality AS midQuality,
-        final_quality AS finalQuality,
-        overall_quality AS overallQuality,
-        race_score AS score,
-        placement,
-        race_score AS score,
-        placement
-      FROM races
-      WHERE user_id = ?
-      ORDER BY start_time DESC`,
+        r.id,
+        r.uma_id AS umaId,
+        r.distance_type AS distanceType,
+        r.start_time AS startTime,
+        r.end_time AS endTime,
+        r.start_quality AS startQuality,
+        r.mid_quality AS midQuality,
+        r.final_quality AS finalQuality,
+        r.overall_quality AS overallQuality,
+        r.race_score AS score,
+        r.placement,
+        uc.name AS umaName,
+        uc.style AS umaStyle
+      FROM races r
+      LEFT JOIN uma_characters uc ON uc.id = r.uma_id
+      WHERE r.user_id = ?
+      ORDER BY r.start_time DESC`,
       [user.id],
     );
 
@@ -92,6 +93,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
   }
 
+  // Validate distanceType matches database ENUM
+  const validDistanceTypes = ['SHORT', 'MID', 'LONG'];
+  if (!validDistanceTypes.includes(distanceType)) {
+    return NextResponse.json({
+      message: `Invalid distance type. Must be one of: ${validDistanceTypes.join(', ')}`
+    }, { status: 400 });
+  }
+
   const conn = await getConnection();
 
   try {
@@ -148,9 +157,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // Calculate coin reward based on placement
+    const getRaceCoinReward = (placement: number): number => {
+      if (placement === 1) return 200;  // 1st place
+      if (placement === 2) return 100;  // 2nd place
+      if (placement === 3) return 50;   // 3rd place
+      return 20; // participation
+    };
+
+    const rewardCoins = getRaceCoinReward(placement);
+
+    // Update user's currency balance
+    await conn.execute(
+      'UPDATE users SET currency_balance = currency_balance + ? WHERE id = ?',
+      [rewardCoins, user.id]
+    );
+
     await conn.commit();
 
-    return NextResponse.json({ message: 'Race saved', id: raceId }, { status: 201 });
+    return NextResponse.json({
+      message: 'Race saved',
+      id: raceId,
+      rewardCoins
+    }, { status: 201 });
   } catch (error) {
     await conn.rollback();
     console.error('POST /api/races error', error);
