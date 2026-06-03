@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import { query } from '@/lib/db';
-import { createSessionToken, setSessionCookie } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
+import { supabaseAdmin } from '@/lib/supabase/admin';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -13,10 +12,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Username, email, and password are required.' }, { status: 400 });
     }
 
-    if (!process.env.JWT_SECRET) {
-      return NextResponse.json({ message: 'Server misconfigured: missing JWT_SECRET' }, { status: 500 });
-    }
-
     if (password.length < MIN_PASSWORD_LENGTH) {
       return NextResponse.json({ message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` }, { status: 400 });
     }
@@ -26,32 +21,43 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid email format.' }, { status: 400 });
     }
 
-    const [existing] = await query(
-      `SELECT id FROM users WHERE email = ? OR username = ? LIMIT 1`,
-      [email, username],
-    );
+    // Check if username already exists
+    const { data: existingUser } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
 
-    if ((existing as any[]).length > 0) {
+    if (existingUser) {
       return NextResponse.json({ message: 'Email or username already exists.' }, { status: 400 });
     }
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+        },
+      },
+    });
 
-    const [result]: any = await query(
-      `INSERT INTO users (username, email, password_hash, created_at) VALUES (?, ?, ?, NOW())`,
-      [username, email, passwordHash],
-    );
+    if (error) {
+      // Supabase returns an error if email already exists
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
 
-    const token = await createSessionToken(result.insertId);
-    const res = NextResponse.json(
-      { user: { id: String(result.insertId), username, email } },
+    if (!data.user) {
+      return NextResponse.json({ message: 'Registration failed.' }, { status: 500 });
+    }
+
+    return NextResponse.json(
+      { user: { id: data.user.id, username, email: data.user.email } },
       { status: 201 },
     );
-    await setSessionCookie(token);
-    return res;
   } catch (error) {
     console.error('POST /api/auth/register error', error);
     return NextResponse.json({ message: 'Registration failed.' }, { status: 500 });
   }
 }
-

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -10,44 +10,32 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const umaId = searchParams.get('uma_id');
 
-    let sql = `
-      SELECT 
-        id,
-        uma_id AS umaId,
-        session_type AS sessionType,
-        quality_pct AS quality,
-        speed_delta AS speedGain,
-        stamina_delta AS staminaGain,
-        technique_delta AS techniqueGain,
-        energy_before AS energyBefore,
-        energy_after AS energyAfter,
-        created_at AS timestamp
-      FROM training_sessions
-      WHERE user_id = ?
-    `;
-    
-    const params: any[] = [user.id];
+    const supabase = await createClient();
+    let query = supabase
+      .from('training_sessions')
+      .select('id, uma_id, session_type, quality_pct, speed_delta, stamina_delta, technique_delta, energy_before, energy_after, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
     if (umaId) {
-      sql += ' AND uma_id = ?';
-      params.push(umaId);
+      query = query.eq('uma_id', Number(umaId));
     }
 
-    sql += ' ORDER BY created_at DESC LIMIT 100';
+    const { data: rows, error } = await query;
+    if (error) throw error;
 
-    const [rows] = await query(sql, params);
-
-    const sessions = (rows as any[]).map((row) => ({
+    const sessions = (rows || []).map((row) => ({
       id: String(row.id),
-      umaId: String(row.umaId),
-      sessionType: row.sessionType,
-      quality: row.quality,
+      umaId: String(row.uma_id),
+      sessionType: row.session_type,
+      quality: row.quality_pct,
       statGains: {
-        speed: row.speedGain || 0,
-        stamina: row.staminaGain || 0,
-        technique: row.techniqueGain || 0,
+        speed: row.speed_delta || 0,
+        stamina: row.stamina_delta || 0,
+        technique: row.technique_delta || 0,
       },
-      timestamp: row.timestamp ? new Date(row.timestamp).getTime() : Date.now(),
+      timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
     }));
 
     return NextResponse.json(sessions);

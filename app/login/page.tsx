@@ -61,29 +61,27 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const success = await login(email, password);
+      const response = await login(email, password);
       // Wait a brief moment to show "VERIFIED" state if successful
-      if (success) {
+      if (response.success) {
         setTimeout(() => router.push('/'), 800);
       } else {
-        // Handle generic failure if not caught by specific error mapping
-        setError('AUTHENTICATION FAILED - INVALID CREDENTIALS');
-        // Map generic failure to fields if possible guess
-        setFieldErrors(prev => ({
-          ...prev,
-          password: 'ACCESS CODE IS INCORRECT', // Common fallback
-        }));
+        // Handle failure by setting the specific error message
+        setError(response.message?.toUpperCase() || 'AUTHENTICATION FAILED - INVALID CREDENTIALS');
+        
+        // Try to map server errors to specific fields
+        const errorMsg = response.message?.toLowerCase() || '';
+        if (errorMsg.includes('user not found') || errorMsg.includes('invalid login credentials')) {
+          setFieldErrors(prev => ({
+            ...prev,
+            email: 'OPERATOR ACCOUNT NOT FOUND OR INVALID CREDENTIALS',
+            password: 'ACCESS CODE IS INCORRECT'
+          }));
+        }
       }
     } catch (err: any) {
       console.error(err);
-      // Try to map server errors if they follow a known structure, otherwise generic
-      if (err?.message === 'USER_NOT_FOUND') {
-        setFieldErrors(prev => ({ ...prev, email: 'NO OPERATOR ACCOUNT FOUND' }));
-      } else if (err?.message === 'INVALID_PASSWORD') {
-        setFieldErrors(prev => ({ ...prev, password: 'ACCESS CODE IS INCORRECT' }));
-      } else {
-        setError('SYSTEM ERROR - CONNECTION TIMEOUT');
-      }
+      setError('SYSTEM ERROR - CONNECTION TIMEOUT');
     } finally {
       if (!user) { // Only stop loading if not successful (to show Verified state)
         setIsLoading(false);

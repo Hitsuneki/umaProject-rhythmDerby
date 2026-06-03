@@ -1,65 +1,48 @@
 import { NextResponse } from 'next/server';
-import { getConnection, query } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
+import { createClient } from '@/lib/supabase/server';
+
+// Helper to group participants by race_id
+function groupParticipants(participants: any[]) {
+  return participants.reduce((acc: Record<number, any[]>, p) => {
+    const rid = p.race_id;
+    if (!acc[rid]) acc[rid] = [];
+    acc[rid].push(p);
+    return acc;
+  }, {});
+}
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {
-    const [raceRows] = await query(
-      `SELECT 
-        r.id,
-        r.uma_id AS umaId,
-        r.distance_type AS distanceType,
-        r.start_time AS startTime,
-        r.end_time AS endTime,
-        r.start_quality AS startQuality,
-        r.mid_quality AS midQuality,
-        r.final_quality AS finalQuality,
-        r.overall_quality AS overallQuality,
-        r.race_score AS score,
-        r.placement,
-        uc.name AS umaName,
-        uc.style AS umaStyle
-      FROM races r
-      LEFT JOIN uma_characters uc ON uc.id = r.uma_id
-      WHERE r.user_id = ?
-      ORDER BY r.start_time DESC`,
-      [user.id],
-    );
+    const supabase = await createClient();
+    // Fetch races belonging to the user along with basic UMA info
+    const { data: raceRows, error: raceError } = await supabase
+      .from('races')
+      .select(`id,uma_id,distance_type,start_time,end_time,start_quality,mid_quality,final_quality,overall_quality,race_score,placement,uma_characters(name,style)`, { head: false })
+      .eq('user_id', user.id)
+      .order('start_time', { ascending: false });
+    if (raceError) throw raceError;
+    if (!raceRows) return NextResponse.json([]);
 
     const raceIds = (raceRows as any[]).map((r) => r.id);
     let participantsMap: Record<number, any[]> = {};
 
     if (raceIds.length > 0) {
-      const [participantRows] = await query(
-        `SELECT 
-          id,
-          race_id AS raceId,
-          is_player AS isPlayer,
-          name,
-          speed,
-          stamina,
-          technique,
-          lane_path AS lanePath,
-          final_pos AS finalPos
-        FROM race_participants
-        WHERE race_id IN (${raceIds.map(() => '?').join(',')})`,
-        raceIds,
-      );
-
-      participantsMap = (participantRows as any[]).reduce((acc, p) => {
-        acc[p.raceId] = acc[p.raceId] || [];
-        acc[p.raceId].push(p);
-        return acc;
-      }, {} as Record<number, any[]>);
+      const { data: participantRows, error: partError } = await supabase
+        .from('race_participants')
+        .select('id,race_id,is_player,name,speed,stamina,technique,lane_path,final_pos')
+        .in('race_id', raceIds as any);
+      if (partError) throw partError;
+      participantsMap = groupParticipants(participantRows as any[]);
     }
 
     const races = (raceRows as any[]).map((race) => ({
       ...race,
       id: String(race.id),
-      createdAt: race.startTime ? new Date(race.startTime).getTime() : Date.now(),
+      createdAt: race.start_time ? new Date(race.start_time).getTime() : Date.now(),
       participants: participantsMap[race.id] ?? [],
     }));
 
@@ -93,99 +76,75 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
   }
 
-  // Validate distanceType matches database ENUM
   const validDistanceTypes = ['SHORT', 'MID', 'LONG'];
   if (!validDistanceTypes.includes(distanceType)) {
-    return NextResponse.json({
-      message: `Invalid distance type. Must be one of: ${validDistanceTypes.join(', ')}`
-    }, { status: 400 });
+    return NextResponse.json({ message: `Invalid distance type. Must be one of: ${validDistanceTypes.join(', ')}` }, { status: 400 });
   }
 
-  const conn = await getConnection();
+  const formattedStartTime = startTime ? new Date(startTime) : new Date();
+  const formattedEndTime = endTime ? new Date(endTime) : new Date();
 
   try {
-    await conn.beginTransaction();
+    const supabase = await createClient();
+    // Insert race
+    const { data: raceData, error: raceError } = await supabase
+      .from('races')
+      .insert([
+        {
+          user_id: user.id,
+          uma_id: umaId,
+          distance_type: distanceType,
+          start_time: formattedStartTime,
+          end_time: formattedEndTime,
+          start_quality: startQuality,
+          mid_quality: midQuality,
+          final_quality: finalQuality,
+          overall_quality: overallQuality,
+          race_score: raceScore,
+          placement,
+        },
+      ])
+      .select('id')
+      .single();
+    if (raceError) throw raceError;
+    const raceId = (raceData as any).id;
 
-    const formattedStartTime = startTime ? new Date(startTime) : new Date();
-    const formattedEndTime = endTime ? new Date(endTime) : new Date();
-
-    const [raceResult]: any = await conn.execute(
-      `INSERT INTO races
-        (user_id, uma_id, distance_type, start_time, end_time, start_quality, mid_quality, final_quality, overall_quality, race_score, placement)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        user.id,
-        umaId,
-        distanceType,
-        formattedStartTime,
-        formattedEndTime,
-        startQuality,
-        midQuality,
-        finalQuality,
-        overallQuality,
-        raceScore,
-        placement,
-      ],
-    );
-
-    const raceId = raceResult.insertId;
-
+    // Insert participants if any
     if (Array.isArray(participants) && participants.length > 0) {
-      const values: any[] = [];
-      const placeholders = participants
-        .map(() => '(?, ?, ?, ?, ?, ?, ?, ?)')
-        .join(',');
-
-      participants.forEach((p: any) => {
-        values.push(
-          raceId,
-          p.isPlayer ? 1 : 0,
-          p.name ?? '',
-          Number(p.speed ?? 0),
-          Number(p.stamina ?? 0),
-          Number(p.technique ?? 0),
-          p.lanePath ?? '',
-          Number(p.finalPos ?? 0)
-        );
-      });
-
-      await conn.execute(
-        `INSERT INTO race_participants
-          (race_id, is_player, name, speed, stamina, technique, lane_path, final_pos)
-         VALUES ${placeholders}`,
-        values,
-      );
+      const participantRows = participants.map((p: any) => ({
+        race_id: raceId,
+        is_player: p.isPlayer ? true : false,
+        name: p.name ?? '',
+        speed: Number(p.speed ?? 0),
+        stamina: Number(p.stamina ?? 0),
+        technique: Number(p.technique ?? 0),
+        lane_path: p.lanePath ?? '',
+        final_pos: Number(p.finalPos ?? 0),
+      }));
+      const { error: partError } = await supabase.from('race_participants').insert(participantRows);
+      if (partError) throw partError;
     }
 
-    // Calculate coin reward based on placement
+    // Determine reward coins based on placement
     const getRaceCoinReward = (placement: number): number => {
-      if (placement === 1) return 200;  // 1st place
-      if (placement === 2) return 100;  // 2nd place
-      if (placement === 3) return 50;   // 3rd place
-      return 20; // participation
+      if (placement === 1) return 200;
+      if (placement === 2) return 100;
+      if (placement === 3) return 50;
+      return 20;
     };
-
     const rewardCoins = getRaceCoinReward(placement);
 
-    // Update user's currency balance
-    await conn.execute(
-      'UPDATE users SET currency_balance = currency_balance + ? WHERE id = ?',
-      [rewardCoins, user.id]
-    );
+    // Update user's currency balance (read-modify-write)
+    const { data: userData, error: userFetchError } = await supabase.from('users').select('currency_balance').eq('id', user.id).single();
+    if (userFetchError) throw userFetchError;
+    const newBalance = (userData as any).currency_balance + rewardCoins;
+    const { error: balanceError } = await supabase.from('users').update({ currency_balance: newBalance }).eq('id', user.id);
+    if (balanceError) throw balanceError;
 
-    await conn.commit();
-
-    return NextResponse.json({
-      message: 'Race saved',
-      id: raceId,
-      rewardCoins
-    }, { status: 201 });
+    return NextResponse.json({ message: 'Race saved', id: raceId, rewardCoins }, { status: 201 });
   } catch (error) {
-    await conn.rollback();
     console.error('POST /api/races error', error);
     return NextResponse.json({ message: 'Failed to save race' }, { status: 500 });
-  } finally {
-    conn.release();
   }
 }
 

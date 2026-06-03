@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 const DEFAULT_TRAIT = 'all_rounder';
@@ -10,46 +10,33 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   const { id } = await params;
-
   try {
-    const [rows] = await query(
-      `SELECT 
-        id,
-        name,
-        temperament,
-        style,
-        level,
-        speed,
-        stamina,
-        technique,
-        energy,
-        max_energy AS maxEnergy,
-        created_at AS createdAt
-      FROM uma_characters
-      WHERE id = ? AND user_id = ?`,
-      [id, user.id],
-    );
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('uma_characters')
+      .select(`*, trait_code, comfort_zone`)
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+    if (error) throw error;
+    if (!data) return NextResponse.json({ message: 'Uma not found' }, { status: 404 });
 
-    const uma = (rows as any[])[0];
-    if (!uma) {
-      return NextResponse.json({ message: 'Uma not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({
-      ...uma,
-      trait: uma.trait_code ?? DEFAULT_TRAIT,
-      comfortZone: uma.comfortZone ?? DEFAULT_COMFORT,
-      id: String(uma.id),
-      createdAt: uma.createdAt ? new Date(uma.createdAt).getTime() : Date.now(),
-      lastEnergyUpdate: uma.lastEnergyUpdate ? new Date(uma.lastEnergyUpdate).getTime() : Date.now(),
-      copiesOwned: uma.copiesOwned ?? 1,
-      bondShards: uma.bondShards ?? 0,
-      bondRank: uma.bondRank ?? 0,
-      limitBreakLevel: uma.limitBreakLevel ?? 0,
-      maxLimitBreak: uma.maxLimitBreak ?? 5,
-    });
-  } catch (error) {
-    console.error('GET /api/uma/[id] error', error);
+    const uma = {
+      ...data,
+      trait: data.trait_code ?? DEFAULT_TRAIT,
+      comfortZone: data.comfort_zone ?? DEFAULT_COMFORT,
+      id: String(data.id),
+      createdAt: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+      lastEnergyUpdate: data.last_energy_at ? new Date(data.last_energy_at).getTime() : Date.now(),
+      copiesOwned: data.copies_owned ?? 1,
+      bondShards: data.bond_shards ?? 0,
+      bondRank: data.bond_rank ?? 0,
+      limitBreakLevel: data.limit_break_level ?? 0,
+      maxLimitBreak: data.max_limit_break ?? 5,
+    };
+    return NextResponse.json(uma);
+  } catch (err) {
+    console.error('GET /api/uma/[id] error', err);
     return NextResponse.json({ message: 'Failed to fetch Uma' }, { status: 500 });
   }
 }
@@ -57,45 +44,30 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
   const { id } = await params;
-
+  const body = await request.json();
+  const allowedFields = [
+    'name', 'temperament', 'style', 'level', 'speed', 'stamina', 'technique',
+    'energy', 'max_energy', 'comfort_zone', 'trait_code'
+  ];
+  const updates: Record<string, any> = {};
+  for (const field of allowedFields) {
+    if (field in body) updates[field] = body[field];
+  }
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
+  }
   try {
-    const body = await request.json();
-    const allowedFields = [
-      'name',
-      'temperament',
-      'style',
-      'level',
-      'speed',
-      'stamina',
-      'technique',
-      'energy',
-      'maxEnergy',
-    ] as const;
-
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    allowedFields.forEach((field) => {
-      if (field in body) {
-        const column = field === 'maxEnergy' ? 'max_energy' : field;
-        updates.push(`${column} = ?`);
-        values.push(body[field]);
-      }
-    });
-
-    if (updates.length === 0) {
-      return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
-    }
-
-    values.push(id, user.id);
-
-    await query(`UPDATE uma_characters SET ${updates.join(', ')} WHERE id = ? AND user_id = ?`, values);
-
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('uma_characters')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
     return NextResponse.json({ message: 'Updated' });
-  } catch (error) {
-    console.error('PUT /api/uma/[id] error', error);
+  } catch (err) {
+    console.error('PUT /api/uma/[id] error', err);
     return NextResponse.json({ message: 'Failed to update Uma' }, { status: 500 });
   }
 }
@@ -103,15 +75,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
   const { id } = await params;
-
   try {
-    await query(`DELETE FROM uma_characters WHERE id = ? AND user_id = ?`, [id, user.id]);
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('uma_characters')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+    if (error) throw error;
     return NextResponse.json({ message: 'Deleted' });
-  } catch (error) {
-    console.error('DELETE /api/uma/[id] error', error);
+  } catch (err) {
+    console.error('DELETE /api/uma/[id] error', err);
     return NextResponse.json({ message: 'Failed to delete Uma' }, { status: 500 });
   }
 }
-
