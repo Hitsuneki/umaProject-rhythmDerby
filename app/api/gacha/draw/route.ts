@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getConnection } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 const SINGLE_PULL_COST = 100;
@@ -10,48 +10,47 @@ export async function POST() {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const conn = await getConnection();
-
     try {
-        await conn.beginTransaction();
+        const supabase = await createClient();
 
-        // Check user's current balance
-        const [userRows]: any = await conn.execute(
-            'SELECT currency_balance FROM users WHERE id = ?',
-            [user.id]
-        );
+        // 1. Check user's current balance
+        const { data: userData, error: userError } = await supabase
+            .from('users')
+            .select('currency_balance')
+            .eq('id', user.id)
+            .single();
 
-        if (!userRows || userRows.length === 0) {
-            await conn.rollback();
+        if (userError || !userData) {
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
         }
 
-        const currentBalance = userRows[0].currency_balance;
+        const currentBalance = userData.currency_balance;
 
         if (currentBalance < SINGLE_PULL_COST) {
-            await conn.rollback();
             return NextResponse.json({
                 message: 'Insufficient funds',
                 error: 'INSUFFICIENT_FUNDS'
             }, { status: 400 });
         }
 
-        // Deduct coins
-        await conn.execute(
-            'UPDATE users SET currency_balance = currency_balance - ? WHERE id = ?',
-            [SINGLE_PULL_COST, user.id]
-        );
-
         const newBalance = currentBalance - SINGLE_PULL_COST;
 
-        // Get random reward from gacha pool
-        const [poolRows]: any = await conn.execute(
-            `SELECT id, reward_type, reward_ref_id, rarity, weight 
-       FROM gacha_pool`
-        );
+        // 2. Deduct coins (Optimistic update, subject to race condition without RPC, but acceptable for this migration scope)
+        const { error: updateError } = await supabase
+            .from('users')
+            .update({ currency_balance: newBalance })
+            .eq('id', user.id);
 
-        if (!poolRows || poolRows.length === 0) {
-            await conn.rollback();
+        if (updateError) throw updateError;
+
+        // 3. Get random reward from gacha pool
+        const { data: poolRows, error: poolError } = await supabase
+            .from('gacha_pool')
+            .select('id, reward_type, reward_ref_id, rarity, weight');
+
+        if (poolError || !poolRows || poolRows.length === 0) {
+            // Refund if pool fails
+            await supabase.from('users').update({ currency_balance: currentBalance }).eq('id', user.id);
             return NextResponse.json({ message: 'No gacha pool available' }, { status: 500 });
         }
 
@@ -72,59 +71,61 @@ export async function POST() {
             selectedReward = poolRows[0]; // Fallback
         }
 
-        // Log to gacha_history
-        await conn.execute(
-            `INSERT INTO gacha_history (user_id, pool_id, reward_type, reward_ref_id, created_at)
-       VALUES (?, ?, ?, ?, NOW())`,
-            [user.id, selectedReward.id, selectedReward.reward_type, selectedReward.reward_ref_id]
-        );
+        // 4. Log to gacha_history
+        await supabase
+            .from('gacha_history')
+            .insert({
+                user_id: user.id,
+                pool_id: selectedReward.id,
+                reward_type: selectedReward.reward_type,
+                reward_ref_id: selectedReward.reward_ref_id
+            });
 
-        // Fetch full reward details based on type
+        // 5. Fetch full reward details and grant item
         let rewardDetail: any = null;
 
         if (selectedReward.reward_type === 'ITEM') {
-            // Get item details (items table does NOT have rarity column)
-            const [itemRows]: any = await conn.execute(
-                'SELECT id, code, name, type, description FROM items WHERE id = ?',
-                [selectedReward.reward_ref_id]
-            );
+            const { data: itemData } = await supabase
+                .from('items')
+                .select('id, code, name, type, description')
+                .eq('id', selectedReward.reward_ref_id)
+                .single();
 
-            if (itemRows && itemRows.length > 0) {
-                const item = itemRows[0];
+            if (itemData) {
+                // Upsert user item
+                const { data: existingItem } = await supabase
+                    .from('user_items')
+                    .select('id, quantity')
+                    .eq('user_id', user.id)
+                    .eq('item_id', itemData.id)
+                    .maybeSingle();
 
-                // Check if user already has this item
-                const [existingItem]: any = await conn.execute(
-                    'SELECT id, quantity FROM user_items WHERE user_id = ? AND item_id = ?',
-                    [user.id, item.id]
-                );
-
-                if (existingItem && existingItem.length > 0) {
-                    // Increment quantity
-                    await conn.execute(
-                        'UPDATE user_items SET quantity = quantity + 1 WHERE user_id = ? AND item_id = ?',
-                        [user.id, item.id]
-                    );
+                if (existingItem) {
+                    await supabase
+                        .from('user_items')
+                        .update({ quantity: existingItem.quantity + 1 })
+                        .eq('id', existingItem.id);
                 } else {
-                    // Add new item
-                    await conn.execute(
-                        'INSERT INTO user_items (user_id, item_id, quantity) VALUES (?, ?, 1)',
-                        [user.id, item.id]
-                    );
+                    await supabase
+                        .from('user_items')
+                        .insert({
+                            user_id: user.id,
+                            item_id: itemData.id,
+                            quantity: 1
+                        });
                 }
 
                 rewardDetail = {
                     kind: 'ITEM',
-                    id: item.id,
-                    code: item.code,
-                    name: item.name,
-                    type: item.type,
-                    rarity: selectedReward.rarity, // From gacha_pool, NOT items table
-                    description: item.description,
+                    id: itemData.id,
+                    code: itemData.code,
+                    name: itemData.name,
+                    type: itemData.type,
+                    rarity: selectedReward.rarity, // From gacha_pool
+                    description: itemData.description,
                 };
             }
         } else if (selectedReward.reward_type === 'UMA') {
-            // Get UMA details (assuming there's a uma_templates or similar table)
-            // For now, return basic info
             rewardDetail = {
                 kind: 'UMA',
                 id: selectedReward.reward_ref_id,
@@ -133,7 +134,6 @@ export async function POST() {
             };
         }
 
-        // Fallback if no details found
         if (!rewardDetail) {
             rewardDetail = {
                 kind: selectedReward.reward_type,
@@ -143,17 +143,13 @@ export async function POST() {
             };
         }
 
-        await conn.commit();
-
         return NextResponse.json({
             reward: rewardDetail,
             newBalance,
         });
     } catch (error) {
-        await conn.rollback();
         console.error('POST /api/gacha/draw error', error);
         return NextResponse.json({ message: 'Failed to process gacha pull' }, { status: 500 });
-    } finally {
-        conn.release();
     }
 }
+

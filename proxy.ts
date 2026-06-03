@@ -1,31 +1,32 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { updateSession } from './lib/supabase/middleware';
 
-export function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
+  const { supabaseResponse, user } = await updateSession(request);
+  const isAuthenticated = !!user;
+
   const { pathname } = request.nextUrl;
-  
-  // Get auth token from cookies
-  const authToken = request.cookies.get('rhythmderby-auth');
-  const isAuthenticated = authToken?.value ? JSON.parse(authToken.value).state?.isAuthenticated : false;
   
   // Protected routes - only dashboard needs middleware protection
   // Other pages (training, racing, etc.) are protected at the API level
-  const protectedRoutes = ['/dashboard'];
+  const protectedRoutes = ['/training', '/racing', '/inventory', '/gacha'];
   const authRoutes = ['/login', '/register'];
   
   // Redirect authenticated users away from auth pages
   if (isAuthenticated && authRoutes.includes(pathname)) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/', request.url));
   }
   
   // Redirect unauthenticated users to login
-  if (!isAuthenticated && protectedRoutes.some(route => pathname.startsWith(route))) {
+  const isProtected = pathname === '/' || protectedRoutes.some(route => pathname.startsWith(route));
+  if (!isAuthenticated && isProtected) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
   
-  return NextResponse.next();
+  return supabaseResponse;
 }
 
 export const config = {

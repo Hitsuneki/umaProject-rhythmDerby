@@ -1,35 +1,29 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
-import { query } from '@/lib/db';
 
 export async function GET() {
-    const user = await getCurrentUser();
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    if (!user) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, username, email, currency_balance')
+      .eq('id', user.id)
+      .single();
 
-    try {
-        // Fetch full user data including currency_balance
-        const [rows]: any = await query(
-            'SELECT id, username, email, currency_balance FROM users WHERE id = ?',
-            [user.id]
-        );
+    if (error) throw error;
 
-        if (!rows || rows.length === 0) {
-            return NextResponse.json({ message: 'User not found' }, { status: 404 });
-        }
-
-        const userData = rows[0];
-
-        return NextResponse.json({
-            id: userData.id,
-            username: userData.username,
-            email: userData.email,
-            currency_balance: userData.currency_balance || 0,
-        });
-    } catch (error) {
-        console.error('GET /api/me error', error);
-        return NextResponse.json({ message: 'Failed to fetch user data' }, { status: 500 });
-    }
+    return NextResponse.json({
+      id: data.id,
+      username: data.username,
+      email: data.email,
+      currency_balance: data.currency_balance ?? 0,
+    });
+  } catch (err) {
+    console.error('GET /api/me error', err);
+    return NextResponse.json({ message: 'Failed to fetch user data' }, { status: 500 });
+  }
 }

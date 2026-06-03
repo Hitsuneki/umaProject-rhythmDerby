@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
@@ -7,28 +7,22 @@ export async function GET() {
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {
-    const [rows] = await query(
-      `SELECT 
-        gh.id,
-        gh.pool_id AS poolId,
-        gh.reward_type AS rewardType,
-        gh.reward_ref_id AS rewardId,
-        gh.created_at AS timestamp,
-        gp.rarity
-      FROM gacha_history gh
-      JOIN gacha_pool gp ON gp.id = gh.pool_id
-      WHERE gh.user_id = ?
-      ORDER BY gh.created_at DESC
-      LIMIT 100`,
-      [user.id]
-    );
+    const supabase = await createClient();
+    const { data: rows, error } = await supabase
+      .from('gacha_history')
+      .select('id, pool_id, reward_type, reward_ref_id, created_at, gacha_pool(rarity)')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(100);
 
-    const history = (rows as any[]).map((row) => ({
+    if (error) throw error;
+
+    const history = (rows || []).map((row) => ({
       id: String(row.id),
-      rewardType: row.rewardType,
-      rewardId: String(row.rewardId),
-      rarity: row.rarity,
-      timestamp: row.timestamp ? new Date(row.timestamp).getTime() : Date.now(),
+      rewardType: row.reward_type,
+      rewardId: String(row.reward_ref_id),
+      rarity: (row.gacha_pool as any)?.rarity,
+      timestamp: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
     }));
 
     return NextResponse.json(history);

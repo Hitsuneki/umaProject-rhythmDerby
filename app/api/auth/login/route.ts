@@ -1,49 +1,97 @@
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
-import { query } from '@/lib/db';
-import { createSessionToken, setSessionCookie, clearSessionCookie } from '@/lib/auth';
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
-  try {
-    const { identifier, password } = await request.json();
+  const { email, password } = await request.json();
 
-    if (!identifier || !password) {
-      return NextResponse.json({ message: 'Email/username and password are required.' }, { status: 400 });
-    }
-
-    if (!process.env.JWT_SECRET) {
-      return NextResponse.json({ message: 'Server misconfigured: missing JWT_SECRET' }, { status: 500 });
-    }
-
-    const [rows] = await query(
-      `SELECT id, username, email, password_hash AS passwordHash FROM users WHERE email = ? OR username = ? LIMIT 1`,
-      [identifier, identifier],
-    );
-
-    const user = (rows as any[])[0];
-    if (!user) {
-      return NextResponse.json({ message: 'User not found.' }, { status: 401 });
-    }
-
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return NextResponse.json({ message: 'Invalid password.' }, { status: 401 });
-    }
-
-    const token = await createSessionToken(user.id);
-    const res = NextResponse.json({
-      user: { id: String(user.id), username: user.username, email: user.email },
-    });
-    await setSessionCookie(token);
-    return res;
-  } catch (error) {
-    console.error('POST /api/auth/login error', error);
-    return NextResponse.json({ message: 'Login failed.' }, { status: 500 });
+  if (!email || !password) {
+    return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 });
   }
+
+  // Initialize Supabase client with cookie handling
+  const cookieStore = await cookies();
+  let supabaseResponse = NextResponse.next({
+    request: { headers: request.headers },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+          supabaseResponse = NextResponse.next({ request });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.user) {
+    return NextResponse.json({ message: error?.message || 'Invalid credentials' }, { status: 401 });
+  }
+
+  // Fetch the public profile for username
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('username')
+    .eq('id', data.user.id)
+    .single();
+
+  const responseBody = {
+    user: {
+      id: data.user.id,
+      username: profile?.username || data.user.user_metadata?.username,
+      email: data.user.email,
+    },
+  };
+
+  // Return the response using the Supabase‑aware NextResponse so cookies are set
+  return supabaseResponse.json(responseBody);
 }
 
 export async function DELETE() {
-  await clearSessionCookie();
-  return NextResponse.json({ message: 'Logged out' });
-}
+  // Sign out via Supabase and clear cookies
+  const cookieStore = await cookies();
+  let supabaseResponse = NextResponse.next({
+    request: { headers: {} },
+  });
 
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return [];
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+          supabaseResponse = NextResponse.next({ request: {} });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            supabaseResponse.cookies.set(name, value, options);
+          });
+        },
+      },
+    },
+  );
+
+  await supabase.auth.signOut();
+  return supabaseResponse.json({ message: 'Logged out' });
+}

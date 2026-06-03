@@ -756,7 +756,7 @@ function RaceHistoryTable({
                     color: 'var(--color-text-primary)'
                   }}
                 >
-                  {race.score.toLocaleString()}
+                  {(race.score ?? 0).toLocaleString()}
                 </td>
                 <td className="px-4 py-3 text-right">
                   {deleteConfirm === race.id ? (

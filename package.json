@@ -10,12 +10,13 @@
     "test:db": "node -r dotenv/config test-db.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "bcryptjs": "^2.4.3",
     "dotenv": "^17.2.3",
     "framer-motion": "^12.23.25",
     "jose": "^5.9.6",
     "lucide-react": "^0.556.0",
-    "mysql2": "^3.15.3",
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",

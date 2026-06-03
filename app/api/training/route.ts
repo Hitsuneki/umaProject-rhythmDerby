@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getConnection, query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -9,25 +9,40 @@ export async function GET() {
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {
-    const [rows] = await query(
-      `SELECT 
+    const supabase = await createClient();
+    const { data: rows, error } = await supabase
+      .from('training_sessions')
+      .select(`
         id,
-        uma_id AS umaId,
-        session_type AS sessionType,
-        quality_pct AS quality,
-        speed_delta AS speedDelta,
-        stamina_delta AS staminaDelta,
-        technique_delta AS techniqueDelta,
-        energy_before AS energyBefore,
-        energy_after AS energyAfter,
-        created_at AS createdAt
-      FROM training_sessions
-      WHERE user_id = ?
-      ORDER BY created_at DESC`,
-      [user.id],
-    );
+        uma_id,
+        session_type,
+        quality_pct,
+        speed_delta,
+        stamina_delta,
+        technique_delta,
+        energy_before,
+        energy_after,
+        created_at
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
 
-    return NextResponse.json(rows);
+    if (error) throw error;
+
+    const mappedRows = (rows || []).map((row) => ({
+      id: row.id,
+      umaId: row.uma_id,
+      sessionType: row.session_type,
+      quality: row.quality_pct,
+      speedDelta: row.speed_delta,
+      staminaDelta: row.stamina_delta,
+      techniqueDelta: row.technique_delta,
+      energyBefore: row.energy_before,
+      energyAfter: row.energy_after,
+      createdAt: row.created_at,
+    }));
+
+    return NextResponse.json(mappedRows);
   } catch (error) {
     console.error('GET /api/training error', error);
     return NextResponse.json({ message: 'Failed to fetch training history' }, { status: 500 });
@@ -54,56 +69,63 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
   }
 
-  const conn = await getConnection();
-
   try {
-    await conn.beginTransaction();
+    const supabase = await createClient();
 
-    const [umaRows]: any = await conn.execute(
-      `SELECT id, speed, stamina, technique, energy, max_energy AS maxEnergy FROM uma_characters WHERE id = ? AND user_id = ? FOR UPDATE`,
-      [umaId, user.id],
-    );
+    // Fetch the current stats of the Uma
+    const { data: uma, error: fetchError } = await supabase
+      .from('uma_characters')
+      .select('id, speed, stamina, technique, energy, max_energy')
+      .eq('id', Number(umaId))
+      .eq('user_id', user.id)
+      .single();
 
-    const uma = umaRows[0];
-    if (!uma) {
-      await conn.rollback();
+    if (fetchError || !uma) {
       return NextResponse.json({ message: 'Uma not found' }, { status: 404 });
     }
 
     const newSpeed = clamp(Number(uma.speed) + Number(speedDelta), 0, 999);
     const newStamina = clamp(Number(uma.stamina) + Number(staminaDelta), 0, 999);
     const newTechnique = clamp(Number(uma.technique) + Number(techniqueDelta), 0, 999);
-    const newEnergy = clamp(Number(energyAfter ?? uma.energy), 0, Number(uma.maxEnergy ?? 100));
+    const newEnergy = clamp(Number(energyAfter ?? uma.energy), 0, Number(uma.max_energy ?? 100));
 
-    const [insertResult]: any = await conn.execute(
-      `INSERT INTO training_sessions
-        (user_id, uma_id, session_type, quality_pct, speed_delta, stamina_delta, technique_delta, energy_before, energy_after, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-      [
-        user.id,
-        umaId,
-        sessionType,
-        qualityPct,
-        speedDelta,
-        staminaDelta,
-        techniqueDelta,
-        energyBefore ?? uma.energy,
-        newEnergy,
-      ],
-    );
+    // Update the Uma
+    const { error: updateError } = await supabase
+      .from('uma_characters')
+      .update({
+        speed: newSpeed,
+        stamina: newStamina,
+        technique: newTechnique,
+        energy: newEnergy,
+        last_energy_at: new Date().toISOString(),
+      })
+      .eq('id', Number(umaId))
+      .eq('user_id', user.id);
 
-    await conn.execute(
-      `UPDATE uma_characters
-       SET speed = ?, stamina = ?, technique = ?, energy = ?, last_energy_at = NOW()
-       WHERE id = ? AND user_id = ?`,
-      [newSpeed, newStamina, newTechnique, newEnergy, umaId, user.id],
-    );
+    if (updateError) throw updateError;
 
-    await conn.commit();
+    // Insert the training session
+    const { data: insertResult, error: insertError } = await supabase
+      .from('training_sessions')
+      .insert({
+        user_id: user.id,
+        uma_id: Number(umaId),
+        session_type: sessionType.toUpperCase(),
+        quality_pct: qualityPct,
+        speed_delta: speedDelta,
+        stamina_delta: staminaDelta,
+        technique_delta: techniqueDelta,
+        energy_before: energyBefore ?? uma.energy,
+        energy_after: newEnergy,
+      })
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
 
     return NextResponse.json({
       message: 'Training saved',
-      id: insertResult.insertId,
+      id: insertResult.id,
       quality: qualityPct,
       gains: {
         speed: speedDelta,
@@ -111,7 +133,7 @@ export async function POST(request: Request) {
         technique: techniqueDelta,
       },
       uma: {
-        id: uma.id,
+        id: String(uma.id),
         speed: newSpeed,
         stamina: newStamina,
         technique: newTechnique,
@@ -119,10 +141,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    await conn.rollback();
     console.error('POST /api/training error', error);
     return NextResponse.json({ message: 'Failed to save training session' }, { status: 500 });
-  } finally {
-    conn.release();
   }
 }

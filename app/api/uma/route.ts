@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 const DEFAULT_TRAIT = 'all_rounder';
@@ -10,40 +10,32 @@ export async function GET() {
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {
-    const [rows] = await query(
-      `SELECT 
-        id,
-        name,
-        temperament,
-        style,
-        trait_code,
-        level,
-        speed,
-        stamina,
-        technique,
-        energy,
-        max_energy AS maxEnergy,
-        created_at AS createdAt
-      FROM uma_characters
-      WHERE user_id = ? AND is_retired = 0
-      ORDER BY created_at ASC`,
-      [user.id],
-    );
+    const supabase = await createClient();
+    const { data: rows, error } = await supabase
+      .from('uma_characters')
+      .select('id, name, temperament, style, trait_code, level, speed, stamina, technique, energy, max_energy, created_at, last_energy_at')
+      .eq('user_id', user.id)
+      .eq('is_retired', false)
+      .order('created_at', { ascending: true });
 
-    const umas = (rows as any[]).map((row) => ({
+    if (error) throw error;
+
+    const umas = (rows || []).map((row) => ({
       ...row,
       trait: row.trait_code ?? DEFAULT_TRAIT,
-      comfortZone: row.comfortZone ?? DEFAULT_COMFORT,
+      comfortZone: DEFAULT_COMFORT, // Field not in DB but required by UI
       id: String(row.id),
-      createdAt: row.createdAt ? new Date(row.createdAt).getTime() : Date.now(),
-      lastEnergyUpdate: row.lastEnergyUpdate
-        ? new Date(row.lastEnergyUpdate).getTime()
+      maxEnergy: row.max_energy,
+      createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+      lastEnergyUpdate: row.last_energy_at
+        ? new Date(row.last_energy_at).getTime()
         : Date.now(),
-      copiesOwned: row.copiesOwned ?? 1,
-      bondShards: row.bondShards ?? 0,
-      bondRank: row.bondRank ?? 0,
-      limitBreakLevel: row.limitBreakLevel ?? 0,
-      maxLimitBreak: row.maxLimitBreak ?? 5,
+      // Defaults for fields removed in schema but expected by frontend
+      copiesOwned: 1,
+      bondShards: 0,
+      bondRank: 0,
+      limitBreakLevel: 0,
+      maxLimitBreak: 5,
     }));
 
     return NextResponse.json(umas);
@@ -59,7 +51,6 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    // Log request body for debugging (avoid leaking secrets; this is controlled input)
     console.log('CREATE UMA BODY:', body);
 
     const { name, temperament, style, trait, speed, stamina, technique } = body;
@@ -72,7 +63,6 @@ export async function POST(request: Request) {
     const allowedStyles: UmaStyle[] = ['Front', 'Mid', 'Back'];
     const allowedTemps = ['calm', 'energetic', 'stubborn', 'gentle'];
 
-    // Map UI labels to DB enum values
     const styleMap: Record<string, UmaStyle> = {
       runner: 'Front',
       pacemaker: 'Front',
@@ -102,31 +92,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid style' }, { status: 400 });
     }
 
-    const [result]: any = await query(
-      `INSERT INTO uma_characters
-        (user_id, name, temperament, style, trait_code, level, exp, speed, stamina, technique, energy, max_energy, last_energy_at, is_retired, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), 0, NOW())`,
-      [
-        user.id,
+    const supabase = await createClient();
+    const { data: result, error } = await supabase
+      .from('uma_characters')
+      .insert({
+        user_id: user.id,
         name,
-        safeTemperament,
-        safeStyle,
-        safeTrait,
-        Number(level ?? 1),
-        0, // exp
-        Number(speed ?? 0),
-        Number(stamina ?? 0),
-        Number(technique ?? 0),
+        temperament: safeTemperament,
+        style: safeStyle,
+        trait_code: safeTrait,
+        level: level,
+        exp: 0,
+        speed: Number(speed ?? 0),
+        stamina: Number(stamina ?? 0),
+        technique: Number(technique ?? 0),
         energy,
-        maxEnergy,
-      ],
-    );
+        max_energy: maxEnergy,
+        is_retired: false,
+      })
+      .select('id, created_at, last_energy_at')
+      .single();
+
+    if (error) throw error;
 
     return NextResponse.json(
       {
-        id: String(result.insertId),
+        id: String(result.id),
         name,
-        temperament,
+        temperament: safeTemperament,
         style,
         trait: safeTrait,
         level,
@@ -136,8 +129,8 @@ export async function POST(request: Request) {
         energy,
         maxEnergy,
         comfortZone,
-        createdAt: Date.now(),
-        lastEnergyUpdate: Date.now(),
+        createdAt: result.created_at ? new Date(result.created_at).getTime() : Date.now(),
+        lastEnergyUpdate: result.last_energy_at ? new Date(result.last_energy_at).getTime() : Date.now(),
         copiesOwned: 1,
         bondShards: 0,
         bondRank: 0,
@@ -151,4 +144,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Failed to create character' }, { status: 500 });
   }
 }
-

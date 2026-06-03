@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { createClient } from '@/lib/supabase/server';
 import { getCurrentUser } from '@/lib/auth';
 
 export async function GET() {
@@ -7,25 +7,27 @@ export async function GET() {
   if (!user) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
   try {
-    const [rows] = await query(
-      `SELECT 
-        ui.id AS userItemId,
-        ui.item_id AS itemId,
-        ui.quantity,
-        i.code,
-        i.name,
-        i.description,
-        i.type
-      FROM user_items ui
-      JOIN items i ON i.id = ui.item_id
-      WHERE ui.user_id = ?
-      ORDER BY i.name ASC`,
-      [user.id]
-    );
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('user_items')
+      .select('item_id, quantity, items(code, name, description, type)')
+      .eq('user_id', user.id);
 
-    return NextResponse.json(rows);
-  } catch (error) {
-    console.error('GET /api/inventory error', error);
+    if (error) throw error;
+
+    // Map to expected shape for frontend
+    const inventory = (data || []).map((row) => ({
+      itemId: row.item_id,
+      quantity: row.quantity,
+      code: (row.items as any)?.code,
+      name: (row.items as any)?.name,
+      description: (row.items as any)?.description,
+      type: (row.items as any)?.type,
+    }));
+
+    return NextResponse.json(inventory);
+  } catch (err) {
+    console.error('GET /api/inventory error', err);
     return NextResponse.json({ message: 'Failed to fetch inventory' }, { status: 500 });
   }
 }
